@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ClosureAI – Partner Guide</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      .partner-page {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 24px 16px 40px;
+      }
+
+      .partner-hero {
+        border-radius: 24px;
+        padding: 24px 22px 26px;
+        background: radial-gradient(circle at top left, #e0f2fe, #eef2ff);
+        border: 1px solid #d4d4ff;
+        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+        display: grid;
+        grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+        gap: 24px;
+        align-items: center;
+      }
+
+      .partner-hero h1 {
+        font-size: 28px;
+        margin-bottom: 8px;
+      }
+
+      .partner-hero p {
+        font-size: 15px;
+        color: #4b5563;
+        margin-bottom: 10px;
+      }
+
+      .partner-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.06);
+        color: #0f172a;
+        margin-bottom: 8px;
+      }
+
+      .partner-hero-highlight {
+        font-size: 14px;
+        color: #1e293b;
+        margin-top: 4px;
+      }
+
+      .partner-hero-card {
+        border-radius: 18px;
+        background: #0f172a;
+        color: #e5e7eb;
+        padding: 16px 18px;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.6);
+      }
+
+      .partner-hero-card h2 {
+        font-size: 16px;
+        margin: 0 0 6px;
+      }
+
+      .partner-hero-card p {
+        font-size: 13px;
+        margin: 0 0 8px;
+        color: #cbd5f5;
+      }
+
+      .partner-meta {
+        font-size: 12px;
+        color: #a5b4fc;
+      }
+
+      .partner-section {
+        margin-top: 28px;
+        border-radius: 20px;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        padding: 20px 20px 18px;
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.04);
+      }
+
+      .partner-section h2 {
+        font-size: 18px;
+        margin-bottom: 4px;
+      }
+
+      .partner-section p {
+        font-size: 14px;
+        color: #4b5563;
+        margin-bottom: 10px;
+      }
+
+      .partner-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin-top: 10px;
+      }
+
+      .partner-card {
+        border-radius: 16px;
+        padding: 14px 14px 12px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        font-size: 13px;
+      }
+
+      .partner-card h3 {
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+
+      .partner-card p {
+        font-size: 13px;
+        margin-bottom: 6px;
+      }
+
+      .partner-list {
+        padding-left: 18px;
+        margin: 6px 0 2px;
+        font-size: 13px;
+      }
+
+      .partner-list li {
+        margin-bottom: 4px;
+      }
+
+      .code-box {
+        margin-top: 10px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        background: #020617;
+        color: #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 13px;
+      }
+
+      .code-label {
+        opacity: 0.7;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .code-value {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+        font-size: 13px;
+      }
+
+      .btn-copy {
+        border: none;
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        background: #22c55e;
+        color: #022c22;
+        white-space: nowrap;
+      }
+
+      .btn-copy:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+
+      .pill-small {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        margin-left: 6px;
+      }
+
+      .script-block {
+        margin-top: 10px;
+        border-radius: 12px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        padding: 10px 12px;
+        font-size: 13px;
+      }
+
+      .script-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #6b7280;
+        margin-bottom: 4px;
+      }
+
+      .script-text {
+        font-size: 13px;
+        white-space: pre-line;
+      }
+
+      .footnote {
+        margin-top: 10px;
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      .partner-footer-note {
+        margin-top: 20px;
+        font-size: 12px;
+        color: #6b7280;
+        text-align: center;
+      }
+
+      @media (max-width: 768px) {
+        .partner-hero {
+          grid-template-columns: minmax(0, 1fr);
+          padding: 18px 16px 20px;
+        }
+        .partner-hero h1 {
+          font-size: 24px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="app-header-inner">
+          <div class="brand">
+            <div class="brand-mark"></div>
+            <div class="brand-text">
+              <div class="brand-title">ClosureAI</div>
+              <div class="brand-subtitle">Holiday Sanity Pass</div>
+            </div>
+          </div>
+          <div class="app-header-right">
+            <a href="/holiday-pass" class="btn btn-ghost">Back to Holiday Pass</a>
+          </div>
+        </div>
+      </header>
+
+      <main class="app-main">
+        <div class="app-main-inner">
+          <div class="partner-page">
+            <!-- Hero -->
+            <section class="partner-hero">
+              <div>
+                <div class="partner-pill">
+                  <span>Partner Guide</span>
+                  <span
+                    style="
+                      width: 6px;
+                      height: 6px;
+                      border-radius: 999px;
+                      background: #22c55e;
+                    "
+                  ></span>
+                  <span>For collaborators & creators</span>
+                </div>
+                <h1>Help your people stay sane this holiday season.</h1>
+                <p>
+                  This page is for friends of ClosureAI — coaches, creators, therapists,
+                  and collaborators who want to share something genuinely helpful with
+                  their audience.
+                </p>
+                <p class="partner-hero-highlight">
+                  You get full access to the Holiday Sanity Pass, so you can try it
+                  yourself before you talk about it.
+                </p>
+              </div>
+              <div class="partner-hero-card">
+                <h2>Quick start</h2>
+                <p>
+                  1. Use your partner code at checkout.<br />
+                  2. Run a real clarity session with something on your mind.<br />
+                  3. If it helps, tell your audience.
+                </p>
+                <div class="code-box">
+                  <div>
+                    <div class="code-label">Partner checkout link</div>
+                    <div class="code-value" id="partner-link">
+                      https://getclosureai.com/holiday-pass
+                    </div>
+                  </div>
+                  <button
+                    class="btn-copy"
+                    type="button"
+                    data-copy-target="partner-link"
+                  >
+                    Copy link
+                  </button>
+                </div>
+                <div class="code-box" style="margin-top: 8px;">
+                  <div>
+                    <div class="code-label">Your partner code</div>
+                    <div class="code-value" id="partner-code">PROMOTER25</div>
+                  </div>
+                  <button
+                    class="btn-copy"
+                    type="button"
+                    data-copy-target="partner-code"
+                  >
+                    Copy code
+                  </button>
+                </div>
+                <p class="partner-meta" style="margin-top: 10px;">
+                  Use this code at checkout to try the Holiday Sanity Pass yourself.
+                </p>
+              </div>
+            </section>
+
+            <!-- Section: What ClosureAI is -->
+            <section class="partner-section">
+              <h2>What is ClosureAI?</h2>
+              <p>
+                ClosureAI is a calm, structured reflection space for people who
+                overthink conversations, dread holiday gatherings, or replay things
+                they wish had gone differently.
+              </p>
+              <div class="partner-grid">
+                <div class="partner-card">
+                  <h3>What it does</h3>
+                  <ul class="partner-list">
+                    <li>Slows down racing thoughts.</li>
+                    <li>Helps organize what actually happened.</li>
+                    <li>Reflects back key themes and emotions.</li>
+                    <li>Offers grounded next steps and language.</li>
+                  </ul>
+                </div>
+                <div class="partner-card">
+                  <h3>What it’s not</h3>
+                  <ul class="partner-list">
+                    <li>Not therapy or crisis support.</li>
+                    <li>Not a replacement for a human professional.</li>
+                    <li>Not generic “advice” or quick tips.</li>
+                  </ul>
+                  <p style="margin-top: 4px;">
+                    It’s like a grounded, emotionally intelligent friend who helps
+                    you sort things out — especially at 2am.
+                  </p>
+                </div>
+              </div>
+              <p class="footnote">
+                Important: If someone is in crisis or thinking about harming themselves
+                or others, we direct them to local emergency services or a crisis hotline.
+              </p>
+            </section>
+
+            <!-- Section: How to try it yourself -->
+            <section class="partner-section">
+              <h2>How to try it yourself</h2>
+              <p>
+                Before you recommend ClosureAI, we want you to experience a real session
+                with something that genuinely matters to you.
+              </p>
+              <ol class="partner-list" style="margin-top: 6px;">
+                <li>Go to <strong>https://getclosureai.com/holiday-pass</strong>.</li>
+                <li>Enter your email and complete checkout using your code
+                  <strong>PROMOTER25</strong>.</li>
+                <li>Click the magic link in your email to open the dashboard.</li>
+                <li>Start a clarity session and talk through a real situation.</li>
+              </ol>
+              <p style="margin-top: 8px;">
+                Try it with: a recent argument, a tough decision, or something you
+                keep replaying. You’ll see quickly how it feels in practice.
+              </p>
+            </section>
+
+            <!-- Section: How to share -->
+            <section class="partner-section">
+              <h2>How to share it with your audience</h2>
+              <p>
+                When you’re ready to share, you can keep it simple. Use the link below
+                and talk about what your own session felt like.
+              </p>
+
+              <div class="partner-card" style="margin-top: 10px;">
+                <h3>Share this link</h3>
+                <p style="margin-bottom: 6px;">
+                  This goes straight to the Holiday Sanity Pass page:
+                </p>
+                <div class="code-box">
+                  <div>
+                    <div class="code-label">Audience link</div>
+                    <div class="code-value" id="audience-link">
+                      https://getclosureai.com/holiday-pass
+                    </div>
+                  </div>
+                  <button
+                    class="btn-copy"
+                    type="button"
+                    data-copy-target="audience-link"
+                  >
+                    Copy link
+                  </button>
+                </div>
+              </div>
+
+              <div class="partner-grid" style="margin-top: 16px;">
+                <div class="partner-card">
+                  <h3>
+                    Instagram / Facebook Caption
+                    <span class="pill-small">Copy & paste</span>
+                  </h3>
+                  <div class="script-block">
+                    <div class="script-label">Suggested caption</div>
+                    <div class="script-text" id="caption-long">
+Holidays can be emotionally messy.
+
+If your brain keeps replaying a conversation or situation, try ClosureAI. It’s a calm space where you can unpack what happened, see it more clearly, and walk away with language you can actually use.
+
+They’re offering a Holiday Sanity Pass for $29 through the season.
+
+I’ve been using it myself and it’s surprisingly grounding.
+
+🧠 Learn more: https://getclosureai.com/holiday-pass
+                    </div>
+                  </div>
+                  <button
+                    class="btn-copy"
+                    style="margin-top: 6px;"
+                    type="button"
+                    data-copy-target="caption-long"
+                  >
+                    Copy caption
+                  </button>
+                </div>
+
+                <div class="partner-card">
+                  <h3>Short hooks & stories</h3>
+                  <div class="script-block">
+                    <div class="script-label">Story script</div>
+                    <div class="script-text" id="story-script">
+Real talk: holiday stress is a lot.
+
+If something is stuck on replay in your head, ClosureAI is like a calm friend that helps you sort it out. You type what happened, it helps you slow down, reflect, and find your next step.
+
+If you’re feeling fried or overwhelmed, this might help:
+https://getclosureai.com/holiday-pass
+                    </div>
+                  </div>
+                  <button
+                    class="btn-copy"
+                    style="margin-top: 6px;"
+                    type="button"
+                    data-copy-target="story-script"
+                  >
+                    Copy story script
+                  </button>
+
+                  <div class="script-block" style="margin-top: 10px;">
+                    <div class="script-label">Short hooks</div>
+                    <div class="script-text" id="short-hooks">
+• “If your brain won’t stop replaying a conversation, try this.”
+• “Holiday stress is real. Here’s something that actually helps.”
+• “Your 2am brain is the worst. This calms it down.”
+                    </div>
+                  </div>
+                  <button
+                    class="btn-copy"
+                    style="margin-top: 6px;"
+                    type="button"
+                    data-copy-target="short-hooks"
+                  >
+                    Copy hooks
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <!-- Section: FAQ / expectations -->
+            <section class="partner-section">
+              <h2>What to tell people (and what not to promise)</h2>
+              <div class="partner-grid">
+                <div class="partner-card">
+                  <h3>Good promises</h3>
+                  <ul class="partner-list">
+                    <li>“It helps you slow your brain down.”</li>
+                    <li>“It organizes what happened and how you feel.”</li>
+                    <li>“You leave with clearer language and a few options.”</li>
+                    <li>“It’s like a grounded friend, not a therapist.”</li>
+                  </ul>
+                </div>
+                <div class="partner-card">
+                  <h3>Please avoid</h3>
+                  <ul class="partner-list">
+                    <li>Calling it “therapy” or “treatment.”</li>
+                    <li>Suggesting it replaces mental health care.</li>
+                    <li>Using it as crisis support.</li>
+                  </ul>
+                  <p style="margin-top: 4px;">
+                    For crisis situations, people should contact local emergency
+                    services or a crisis hotline in their area.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <p class="partner-footer-note">
+              Questions, ideas, or want a custom script for your audience?
+              Reach out to Keith and we’ll make it easy.
+            </p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      // Simple copy-to-clipboard helper
+      document.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".btn-copy");
+        if (!btn) return;
+
+        const targetId = btn.getAttribute("data-copy-target");
+        if (!targetId) return;
+
+        const el = document.getElementById(targetId);
+        if (!el) return;
+
+        const text = el.innerText.trim();
+
+        try {
+          await navigator.clipboard.writeText(text);
+          const original = btn.textContent;
+          btn.textContent = "Copied!";
+          btn.disabled = true;
+          setTimeout(() => {
+            btn.textContent = original;
+            btn.disabled = false;
+          }, 1500);
+        } catch (err) {
+          console.error("Copy failed:", err);
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{APP_NAME}}</title>
+  <link rel="stylesheet" href="/styles.css" />
+
+  <!-- PWA stuff -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="{{THEME_COLOR}}" />
+  <link rel="apple-touch-icon" href="{{APP_ICON_192}}" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="{{APP_NAME}}" />
+
+  <style>
+    body {
+      background: #050816;
+      color: #fff;
+      font-family: system-ui, sans-serif;
+      height: 100vh;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+    .spinner {
+      margin-top: 24px;
+      width: 32px;
+      height: 32px;
+      border: 4px solid rgba(255,255,255,0.2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .error {
+      margin-top: 20px;
+      color: #ff6b6b;
+      font-size: 14px;
+    }
+    .retry-btn {
+      margin-top: 12px;
+      background: #444;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      border: 1px solid #666;
+    }
+  </style>
+</head>
+
+<body>
+  <img src="{{APP_LOGO}}" alt="{{APP_NAME}}" style="height:48px; margin-bottom:20px;">
+  <h1 style="font-size:20px; margin:0;">{{APP_NAME}}</h1>
+  <p style="opacity:0.7; margin-top:8px;">Loading securely…</p>
+  <div class="spinner"></div>
+
+  <div id="error" class="error" style="display:none;"></div>
+  <div id="retry" class="retry-btn" style="display:none;" onclick="window.location.reload()">Retry</div>
+
+  <script>
+    async function checkAuth() {
+      try {
+        const res = await fetch("/auth/status", {
+          credentials: "include"
+        });
+
+        if (!res.ok) throw new Error("Network issue");
+
+        const data = await res.json();
+
+        if (data.authenticated) {
+          window.location.href = "/dashboard";
+        } else {
+          window.location.href = "/login";
+        }
+
+      } catch (err) {
+        document.getElementById("error").textContent =
+          "We couldn’t reach the server. Check your connection.";
+        document.getElementById("error").style.display = "block";
+        document.getElementById("retry").style.display = "inline-block";
+      }
+    }
+
+    checkAuth();
+  </script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/service-worker.js").catch(console.error);
+      });
+    }
+  </script>
+  
+
+</body>
+</html>

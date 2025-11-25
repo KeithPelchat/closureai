@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{APP_NAME}} – Sign in</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <meta name="theme-color" content="{{THEME_COLOR}}" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="{{APP_ICON_192}}" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="default"
+    />
+
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      /* Light, neutral layout that should sit on top of your global styles */
+
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f3f4f6;
+      }
+
+      .auth-shell {
+        width: 100%;
+        max-width: 440px;
+        padding: 24px;
+      }
+
+      .auth-card {
+        background: #ffffff;
+        border-radius: 20px;
+        box-shadow: 0 18px 60px rgba(15, 23, 42, 0.15);
+        padding: 24px 22px 22px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+      }
+
+      .auth-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      .auth-brand-logo {
+        height: 32px;
+        width: auto;
+      }
+
+      .auth-brand-text {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .auth-brand-title {
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+
+      .auth-brand-subtitle {
+        font-size: 13px;
+        color: #6b7280;
+      }
+
+      .auth-heading {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+
+      .auth-subcopy {
+        font-size: 13px;
+        color: #6b7280;
+        margin: 0 0 18px;
+      }
+
+      .auth-field-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 12px;
+      }
+
+      .auth-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: #374151;
+      }
+
+      .auth-input {
+        border-radius: 10px;
+        border: 1px solid #d1d5db;
+        padding: 9px 11px;
+        font-size: 14px;
+        outline: none;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .auth-input:focus {
+        border-color: #4f46e5;
+        box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.15);
+      }
+
+      .auth-actions {
+        margin-top: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .btn-primary {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        border: none;
+        padding: 9px 16px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        background: #111827;
+        color: #f9fafb;
+        width: 100%;
+      }
+
+      .btn-primary:disabled {
+        opacity: 0.65;
+        cursor: default;
+      }
+
+      .btn-secondary {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        border-radius: 999px;
+        padding: 9px 16px;
+        border: 1px solid #d1d5db;
+        background: #ffffff;
+        color: #111827;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        width: 100%;
+      }
+
+      .auth-or {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 6px 0;
+      }
+
+      .auth-or-line {
+        flex: 1;
+        height: 1px;
+        background: #e5e7eb;
+      }
+
+      .auth-or-text {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #9ca3af;
+      }
+
+      .auth-helper {
+        margin-top: 10px;
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      .auth-status {
+        margin-top: 8px;
+        font-size: 12px;
+      }
+
+      .auth-status--ok {
+        color: #15803d;
+      }
+
+      .auth-status--error {
+        color: #b91c1c;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="auth-shell">
+      <section class="auth-card">
+        <div class="auth-brand">
+          <img
+            src="{{APP_LOGO}}"
+            alt="{{APP_NAME}}"
+            class="auth-brand-logo"
+            onerror="this.style.display='none'"
+          />
+          <div class="auth-brand-text">
+            <span class="auth-brand-title">{{APP_NAME}}</span>
+            <span class="auth-brand-subtitle">Secure sign in</span>
+          </div>
+        </div>
+
+        <h1 class="auth-heading">Welcome back</h1>
+        <p class="auth-subcopy">
+          Use a one-time <strong>Secure Link</strong> or continue with Google.
+          No passwords to remember.
+        </p>
+
+        <form id="secure-link-form" novalidate>
+          <div class="auth-field-group">
+            <label for="name" class="auth-label">Name (optional)</label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              class="auth-input"
+              autocomplete="name"
+              placeholder="What should we call you?"
+            />
+          </div>
+
+          <div class="auth-field-group">
+            <label for="email" class="auth-label">Email</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              class="auth-input"
+              autocomplete="email"
+              placeholder="you@example.com"
+              required
+            />
+          </div>
+
+          <div class="auth-actions">
+            <button id="secure-link-submit" type="submit" class="btn-primary">
+              Email me a Secure Link
+            </button>
+          </div>
+
+          <div id="secure-link-status" class="auth-status"></div>
+        </form>
+
+        <div class="auth-or">
+          <div class="auth-or-line"></div>
+          <div class="auth-or-text">Or</div>
+          <div class="auth-or-line"></div>
+        </div>
+
+        <button id="google-btn" type="button" class="btn-secondary">
+          <!-- Minimal "G" shape, text-only fallback if CSS/images differ -->
+          <span
+            style="
+              width: 16px;
+              height: 16px;
+              border-radius: 4px;
+              border: 1px solid #d1d5db;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 11px;
+              font-weight: 700;
+            "
+            >G</span
+          >
+          <span>Continue with Google</span>
+        </button>
+
+        <p class="auth-helper">
+          By signing in, you agree to the terms and understand this is
+          <strong>not</strong> therapy or medical advice.
+        </p>
+      </section>
+    </div>
+
+    <script>
+      async function sendSecureLink(email, name) {
+        const res = await fetch("/auth/secure-link", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, name }),
+        });
+
+        if (!res.ok) {
+          let text = await res.text();
+          try {
+            const json = JSON.parse(text || "{}");
+            throw new Error(json.error || json.message || "Error sending link");
+          } catch {
+            throw new Error(text || "Error sending link");
+          }
+        }
+
+        return res.json();
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const form = document.getElementById("secure-link-form");
+        const emailInput = document.getElementById("email");
+        const nameInput = document.getElementById("name");
+        const submitBtn = document.getElementById("secure-link-submit");
+        const statusEl = document.getElementById("secure-link-status");
+        const googleBtn = document.getElementById("google-btn");
+
+        if (form) {
+          form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            if (!emailInput.value.trim()) {
+              emailInput.focus();
+              return;
+            }
+
+            submitBtn.disabled = true;
+            statusEl.textContent = "Sending Secure Link…";
+            statusEl.className = "auth-status";
+
+            try {
+              await sendSecureLink(emailInput.value.trim(), nameInput.value.trim());
+
+              statusEl.textContent =
+                "Secure Link sent. Please check your email to continue.";
+              statusEl.className = "auth-status auth-status--ok";
+            } catch (err) {
+              console.error("Secure Link error:", err);
+              statusEl.textContent =
+                err.message ||
+                "We couldn’t send your Secure Link. Please try again.";
+              statusEl.className = "auth-status auth-status--error";
+            } finally {
+              submitBtn.disabled = false;
+            }
+          });
+        }
+
+        if (googleBtn) {
+          googleBtn.addEventListener("click", () => {
+            // Simple redirect to start Google OAuth
+            window.location.href = "/auth/google";
+          });
+        }
+      });
+    </script>
+  </body>
+</html>

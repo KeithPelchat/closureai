@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Custom AI Clarity App for Coaches – ClosureAI</title>
+  <meta name="description" content="Get your own custom AI clarity micro-app built on the ClosureAI engine, tailored to your coaching method and plugged into the platforms you already use.">
+
+  <!-- Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- OG / Social -->
+  <meta property="og:title" content="ClosureAI — Custom AI Clarity App for Coaches">
+  <meta property="og:description" content="Give your clients a focused, distraction-free AI clarity space between sessions — built just for your coaching practice.">
+  <meta property="og:image" content="https://getclosureai.com/assets/og-closureai-holiday.png">
+  <meta property="og:url" content="https://getclosureai.com/coach">
+  <meta property="og:type" content="website">
+
+  <style>
+    :root {
+      --bg-page: #f5fafc;
+      --bg-hero-top: #fdfbff;
+      --bg-hero-bottom: #e6f4ff;
+      --bg-section-alt: #f9fbff;
+      --text-main: #0a2540;
+      --text-muted: #5e7488;
+      --border-subtle: #dde7f0;
+      --card-bg: #ffffff;
+      --accent-teal: #3bd6c6;
+      --accent-blue: #19b0fa;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-page);
+      color: var(--text-main);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1, h2, h3 {
+      margin-top: 0;
+      font-weight: 700;
+      color: #06263d;
+      letter-spacing: -0.01em;
+    }
+
+    h1 {
+      font-size: 40px;
+      line-height: 1.15;
+    }
+
+    h2 {
+      font-size: 28px;
+      line-height: 1.25;
+    }
+
+    h3 {
+      font-size: 22px;
+      line-height: 1.3;
+    }
+
+    p, li {
+      font-size: 18px;
+    }
+
+    .section {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 64px 24px;
+    }
+
+    .section-alt {
+      background: var(--bg-section-alt);
+      border-top: 1px solid rgba(221, 231, 240, 0.7);
+      border-bottom: 1px solid rgba(221, 231, 240, 0.7);
+    }
+
+    .section-inner {
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    /* Container to center buttons */
+    .section-cta-block {
+      margin: 24px 0 16px;
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    /* Styled CTA button */
+    .section-cta {
+      background: linear-gradient(135deg, #0ea5e9, #2563eb);
+      color: #ffffff;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 12px 30px rgba(37, 99, 235, 0.35);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+    }
+
+    .section-cta:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+      box-shadow: 0 16px 38px rgba(37, 99, 235, 0.40);
+    }
+
+    .section-cta:active {
+      transform: translateY(0);
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.30);
+    }
+
+    .section-cta-secondary {
+      background: #ffffff;
+      color: var(--text-muted);
+      padding: 11px 22px;
+      font-size: 15px;
+      font-weight: 500;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      cursor: pointer;
+      transition: background 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .section-cta-secondary:hover {
+      background: #f1f5f9;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+      transform: translateY(-1px);
+    }
+
+    .code-pill {
+      font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: #0f172a;
+      color: #e5e7eb;
+      border: 1px solid #1f2937;
+    }
+
+    /* ---------- Header / Hero ---------- */
+
+    .hero-wrap {
+      background: radial-gradient(circle at top left, var(--bg-hero-top) 0, var(--bg-hero-bottom) 65%, #e1f4ff 100%);
+      border-bottom: 1px solid rgba(221, 231, 240, 0.8);
+    }
+
+    .site-header {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 18px 24px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+
+    .logo img {
+      height: 44px;
+      width: auto;
+      display: block;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 32px 24px 72px;
+    }
+
+    .hero h1 {
+      font-size: 38px;
+    }
+
+    .hero p {
+      max-width: 700px;
+      margin: 20px auto 0;
+      font-size: 19px;
+      color: var(--text-muted);
+    }
+
+    .hero-subtext {
+      margin-top: 12px;
+      font-size: 15px;
+      color: var(--text-muted);
+    }
+
+    .hero-tagline {
+      font-size: 15px;
+      color: var(--text-muted);
+      margin-top: 10px;
+    }
+
+    /* CTA row in hero */
+
+    .cta-row {
+      margin-top: 28px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .hero-note {
+      margin-top: 10px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .hero-note code {
+      font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #0f172a;
+      color: #e5e7eb;
+      border: 1px solid #1f2937;
+    }
+
+    /* ---------- Cards ---------- */
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 18px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+      padding: 22px 22px 20px;
+    }
+
+    .steps {
+      display: grid;
+      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    }
+
+    .step-box {
+      background: var(--card-bg);
+      border-radius: 16px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
+      padding: 20px 20px 18px;
+    }
+
+    .step-label {
+      display: inline-block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+
+    .step-label span {
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    /* ---------- Social Proof / Stats ---------- */
+
+    .social-proof {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 60px 24px 90px;
+    }
+
+    .stats {
+      display: grid;
+      gap: 32px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      margin-top: 32px;
+    }
+
+    .stat-box {
+      background: #ffffff;
+      border-radius: 18px;
+      padding: 28px;
+      box-shadow: 0 10px 36px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 220px;
+    }
+
+    .stat-box h3 {
+      margin-top: 0;
+      margin-bottom: 6px;
+    }
+
+    .stat-box p {
+      margin-bottom: 0;
+    }
+
+    .stat-box small {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* ---------- Price / List ---------- */
+
+    .price-tag {
+      display: inline-block;
+      margin-bottom: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .price-tag small {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .price-subtext {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .feature-list {
+      list-style: none;
+      padding-left: 0;
+      margin: 16px 0 0;
+    }
+
+    .feature-list li {
+      position: relative;
+      padding-left: 22px;
+      margin-bottom: 8px;
+      font-size: 16px;
+      color: var(--text-muted);
+    }
+
+    .feature-list li::before {
+      content: "•";
+      position: absolute;
+      left: 6px;
+      top: 0;
+      color: var(--accent-blue);
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .tiny-note {
+      font-size: 13px;
+      color: #7a8a9a;
+      margin-top: 18px;
+    }
+
+    .tiny-note em {
+      font-style: italic;
+    }
+
+    /* ---------- Footer ---------- */
+
+    footer {
+      margin-top: 24px;
+      padding: 32px 24px 28px;
+      text-align: center;
+      font-size: 14px;
+      color: #7a8a9a;
+      border-top: 1px solid rgba(221, 231, 240, 0.9);
+      background: #f7fbff;
+    }
+
+    footer a {
+      color: #19b0fa;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* ---------- Responsive ---------- */
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 30px;
+      }
+
+      .hero h1 {
+        font-size: 30px;
+      }
+
+      h2 {
+        font-size: 24px;
+      }
+
+      p, li {
+        font-size: 16px;
+      }
+
+      .section {
+        padding: 48px 18px;
+      }
+
+      .hero {
+        padding: 28px 18px 56px;
+      }
+
+      .logo img {
+        height: 36px;
+      }
+
+      .section-cta,
+      .section-cta-secondary {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    @media (min-width: 1100px) {
+      .section {
+        padding-top: 72px;
+        padding-bottom: 72px;
+      }
+
+      .hero {
+        padding-bottom: 84px;
+      }
+
+      h1 {
+        font-size: 44px;
+      }
+
+      .hero h1 {
+        font-size: 44px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HERO + HEADER WRAP -->
+  <div class="hero-wrap">
+    <header class="site-header">
+      <a href="/" class="logo">
+        <img src="/assets/closureai_logo_lockup.svg" alt="ClosureAI logo">
+      </a>
+    </header>
+
+    <section class="hero section" aria-labelledby="hero-title">
+      <div class="section-inner" id="coach-cta">
+        <h1 id="hero-title">Give your clients a focused AI clarity space between sessions</h1>
+        <p>
+          Instead of sending them to generic ChatGPT (and the rest of the internet),
+          give them a calm, branded micro-app that helps them process hard moments
+          using <em>your</em> language and <em>your</em> coaching approach.
+        </p>
+        <p class="hero-tagline">
+          Built on the same engine as ClosureAI — customized for your practice.
+        </p>
+
+        <div class="cta-row">
+          <a
+            href="mailto:keith@moreleads.online?subject=Custom%20Coach%20App%20Interest"
+            class="section-cta"
+          >
+            Apply for a Custom Build
+          </a>
+          <a href="/holiday-pass" class="section-cta-secondary">
+            Try ClosureAI Free First
+            <span class="code-pill">COACH2025</span>
+          </a>
+        </div>
+
+        <p class="hero-note">
+          Use code <code>COACH2025</code> at checkout on the Holiday Sanity Pass page to unlock
+          <strong>100% off</strong> for yourself. Feel how the core experience works before we design your version.
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <main>
+    <!-- PROBLEM -->
+    <section class="section section-alt">
+      <div class="section-inner">
+        <h2>The real problem isn’t that your clients don’t “know what to do.”</h2>
+        <p>
+          They usually have plenty of tools, frameworks, and notes from your calls.
+          The problem is the <em>emotional static</em> between sessions — the late-night spirals,
+          overthinking, and “I can’t tell what’s actually going on” moments when you’re not there.
+        </p>
+        <p>
+          Sending them to ChatGPT drops them into a noisy, distracting universe.
+          They don't need more options. They need a focused space to get clear.
+        </p>
+      </div>
+    </section>
+
+    <!-- FAILURE -->
+    <section class="section">
+      <div class="section-inner">
+        <h2>If you keep relying on generic tools, you already know how that goes.</h2>
+        <ul>
+          <li>Clients spin out between sessions instead of integrating the work.</li>
+          <li>You become the emergency text/DM hotline when things feel big.</li>
+          <li>They copy-paste ChatGPT walls of text into Voxer asking, “Is this right?”</li>
+          <li>Your method gets diluted by whatever the algorithm serves them that day.</li>
+        </ul>
+        <p>
+          It’s not that they don’t trust you.  
+          They just don’t have a clean, guided place to work through moments when the emotions hit.
+        </p>
+      </div>
+      <div class="section-cta-block">
+        <button type="button" class="section-cta scroll-to-cta">
+          Talk About a Custom Build
+        </button>
+      </div>
+    </section>
+
+    <!-- SUCCESS -->
+    <section class="section section-alt">
+      <div class="section-inner">
+        <h2>Imagine having “your own app” that quietly supports the work you already do.</h2>
+        <p>
+          Same clients. Same calls.  
+          But now they have a private, AI-guided space to process the hard stuff using your philosophy instead of random internet advice.
+        </p>
+        <ul>
+          <li>Clients feel more grounded between sessions instead of waiting until they’re overwhelmed.</li>
+          <li>You spend less time firefighting in DMs and more time coaching.</li>
+          <li>Your program feels more premium because it includes a “signature AI tool.”</li>
+          <li>You stay top-of-mind every time they open the app to work through something.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- GUIDE / WHAT YOU GET -->
+    <section class="section">
+      <div class="section-inner">
+        <div class="card">
+          <h2>A custom AI clarity micro-app built on ClosureAI, shaped around your coaching method.</h2>
+          <p>
+            You’re the guide.  
+            The app simply gives your clients a focused place to sort through their thoughts so they can show up clearer to the work you do together.
+          </p>
+
+          <p class="price-tag">
+            Founders Beta: $995 <small>one-time build</small>
+          </p>
+          <p class="price-subtext">
+            + <strong>$97/month</strong> hosting &amp; maintenance  
+            (secure hosting, updates, and light ongoing tweaks as things evolve).
+          </p>
+
+          <ul class="feature-list">
+            <li>Custom-branded experience with your name, colors, and core messaging.</li>
+            <li>Clarity flows designed around your niche (relationships, business, nervous system, leadership, etc.).</li>
+            <li>A simple link you can embed in Kajabi, HighLevel, ClickFunnels, Kartra, Podia, Mighty Networks, or your portal.</li>
+            <li>Session logging on the backend so you can see patterns in how often clients use it and when.</li>
+            <li>Future-friendly prompts so you’re ready for 2026 without needing to rebuild.</li>
+            <li>Only 5 spots left before the price increases</li>
+          </ul>
+
+          <p class="tiny-note">
+            <strong>Important:</strong> ClosureAI and any custom apps built on this engine are for reflection and clarity support only.
+            They are not therapy or medical care and do not provide medical, legal, or crisis advice.  
+            If your clients are in crisis, they should contact local emergency services or a crisis hotline in their area.
+          </p>
+        </div>
+
+        <div class="section-cta-block">
+          <a
+            href="mailto:keith@moreleads.online?subject=Custom%20Coach%20App%20Interest"
+            class="section-cta"
+          >
+            I’m Interested — Let’s Talk
+          </a>
+          <a href="/holiday-pass" class="section-cta-secondary">
+            Try ClosureAI with
+            <span class="code-pill">COACH2025</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- PLAN / STATS / PLATFORM FIT -->
+    <section class="social-proof">
+      <h2>Built to fit alongside the platforms you already use.</h2>
+      <p>
+        This isn’t “one more system” to migrate into.  
+        It’s a focused micro-app that plugs into your existing ecosystem and makes your coaching feel more supported and differentiated.
+      </p>
+
+      <div class="stats">
+        <div class="stat-box">
+          <h3>Plays nicely with your stack</h3>
+          <p>
+            Add your app link to:
+          </p>
+          <ul class="feature-list" style="margin-top: 10px;">
+            <li>Kajabi product areas &amp; automations</li>
+            <li>GoHighLevel memberships &amp; workflows</li>
+            <li>ClickFunnels thank-you pages and member areas</li>
+            <li>Kartra, Podia, Mighty Networks, and more</li>
+          </ul>
+          <p style="margin-top: 10px;">
+            If you can paste a link, you can plug it in.
+          </p>
+        </div>
+
+        <div class="stat-box">
+          <h3>Simple 3-step build process</h3>
+          <p>
+            <span class="step-label">Step 1: <span>Quick mapping call</span></span><br />
+            We identify your niche, client patterns, and the kinds of moments you want the app to support.
+          </p>
+          <p style="margin-top: 10px;">
+            <span class="step-label">Step 2: <span>Design &amp; build</span></span><br />
+            I handle flows, prompts, and UI, then stand up your app on secure hosting.
+          </p>
+          <p style="margin-top: 10px;">
+            <span class="step-label">Step 3: <span>Launch to clients</span></span><br />
+            You get a simple link + quickstart guidance so your clients know exactly how to use it.
+          </p>
+        </div>
+
+        <div class="stat-box">
+          <h3>Try the engine for yourself first</h3>
+          <p>
+            Before we talk about a custom build, you can use the core ClosureAI experience
+            with a full discount.
+          </p>
+          <p style="margin-top: 12px;">
+            On the Holiday Sanity Pass page, use code:
+          </p>
+          <p style="margin-top: 4px;">
+            <span class="code-pill">COACH2025</span>
+          </p>
+          <p style="margin-top: 10px;">
+            Experience what it feels like to have a focused, distraction-free clarity space — then imagine what a version tailored to
+            your clients could do.
+          </p>
+        </div>
+      </div>
+
+      <div class="section-cta-block">
+        <button type="button" class="section-cta scroll-to-cta">
+          Talk About a Custom Build
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <p style="margin:0 0 4px;">
+      © 2025 ClosureAI. All rights reserved. A product of More Leads Online LLC.
+    </p>
+    <p style="margin:0 0 4px;font-size:13px;color:#7a8a9a;">
+      ClosureAI and any custom apps built on this engine are not a substitute for therapy or medical care and do not provide
+      medical, legal, or crisis advice. If you are in crisis, please contact local emergency services or a crisis hotline
+      in your area.
+    </p>
+    <p style="margin:8px 0 0;font-size:13px;">
+      <a href="/terms">Terms &amp; Conditions</a>
+      &nbsp;·&nbsp;
+      <a href="/privacy">Privacy Policy</a>
+      &nbsp;·&nbsp;
+      <a href="/disclaimer">Disclaimer</a>
+    </p>
+  </footer>
+
+  <script>
+    // Scroll helper for "Talk About a Custom Build" buttons
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest(".scroll-to-cta");
+      if (!btn) return;
+
+      e.preventDefault();
+
+      const target = document.getElementById("coach-cta");
+      if (!target) return;
+
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ClosureAI – Clarity Session</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/styles.css" />
+
+    <style>
+      /* ---- Let the page scroll naturally ---- */
+
+      html,
+      body {
+        height: auto;
+        min-height: 100%;
+      }
+
+      .app-main,
+      .app-main-inner {
+        height: auto;
+        min-height: 0;
+        overflow: visible !important;
+      }
+
+      .app-shell {
+        overflow: visible !important;
+      }
+
+      /* ---- Session page layout ---- */
+
+      .session-page {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 24px 16px 40px;
+        font-size: 16px;
+      }
+
+      .session-header {
+        margin-bottom: 22px;
+      }
+
+      .session-header h1 {
+        font-size: 30px;
+        margin-bottom: 8px;
+        color: #0f172a;
+      }
+
+      .session-header p {
+        font-size: 16px;
+        color: #4b5563;
+        margin: 0;
+        line-height: 1.6;
+      }
+
+      /* ---- “How this works” box ---- */
+
+      .session-how {
+        margin-bottom: 28px;
+        padding: 20px 22px;
+        border-radius: 20px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        font-size: 16px;
+        color: #1f2937;
+        line-height: 1.6;
+      }
+
+      .session-how h2 {
+        font-size: 20px;
+        margin: 0 0 10px;
+        color: #0f172a;
+        font-weight: 700;
+      }
+
+      .session-how p {
+        margin: 0 0 14px;
+      }
+
+      .session-how ul {
+        margin: 0 0 6px 22px;
+        padding: 0;
+      }
+
+      .session-how li {
+        margin-bottom: 8px;
+      }
+
+      /* ---- Conversation card ---- */
+
+      .session-card {
+        margin-top: 12px;
+        border-radius: 20px;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
+        overflow: visible;
+        display: block;
+      }
+
+      .session-card-header {
+        padding: 14px 18px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 15px;
+        background: linear-gradient(90deg, #f9fafb, #eff6ff);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .session-card-header strong {
+        font-weight: 600;
+      }
+
+      .conversation-wrapper {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .chat-log-container {
+        padding: 16px 18px 10px;
+        background: linear-gradient(#f9fafb, #eff6ff);
+        overflow: visible;
+      }
+
+      .chat-log {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .chat-empty {
+        font-size: 15px;
+        color: #6b7280;
+        background: rgba(255, 255, 255, 0.85);
+        border-radius: 16px;
+        padding: 12px 14px;
+        border: 1px dashed #cbd5f5;
+      }
+
+      .chat-row {
+        max-width: 88%;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .chat-row-user {
+        align-self: flex-end;
+        text-align: right;
+      }
+
+      .chat-row-assistant {
+        align-self: flex-start;
+        text-align: left;
+      }
+
+      .chat-label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #6b7280;
+      }
+
+      .chat-row-user .chat-label {
+        align-self: flex-end;
+      }
+
+      .chat-row-assistant .chat-label {
+        align-self: flex-start;
+      }
+
+      .chat-bubble {
+        border-radius: 18px;
+        padding: 12px 14px;
+        font-size: 17px;
+        line-height: 1.65;
+        word-wrap: break-word;
+        white-space: pre-wrap;
+      }
+
+      .chat-row-user .chat-bubble {
+        background: #0ea5e9;
+        color: #f9fafb;
+        border-bottom-right-radius: 4px;
+        font-size: 18px;
+      }
+
+      .chat-row-assistant .chat-bubble {
+        background: #ffffff;
+        color: #111827;
+        border: 1px solid #dbeafe;
+        border-bottom-left-radius: 4px;
+      }
+
+      /* ---- Composer ---- */
+
+      .composer {
+        border-top: 1px solid #e5e7eb;
+        background: #ffffff;
+        padding: 16px 16px 14px;
+      }
+
+      .composer label {
+        display: block;
+        font-size: 15px;
+        font-weight: 500;
+        margin-bottom: 8px;
+        color: #0f172a;
+      }
+
+      .composer textarea {
+        width: 100%;
+        min-height: 150px;
+        resize: vertical;
+        font-size: 18px;
+        line-height: 1.6;
+        padding: 14px 14px;
+        border-radius: 12px;
+        border: 1px solid #d1d5db;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+      }
+
+      .composer textarea:focus {
+        outline: none;
+        border-color: #0ea5e9;
+        box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.25);
+      }
+
+      .composer-footer {
+        margin-top: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+
+      .tip-text {
+        font-size: 14px;
+        color: #6b7280;
+        line-height: 1.5;
+      }
+
+      .tip-text strong {
+        font-weight: 600;
+      }
+
+      .error-text {
+        font-size: 13px;
+        color: #b91c1c;
+        margin-top: 6px;
+      }
+
+      .btn-primary {
+        border-radius: 999px;
+        padding: 10px 22px;
+        font-size: 15px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+
+      .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border-radius: 999px;
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        border-top-color: #ffffff;
+        animation: spin 0.7s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ---- Disclaimer under composer ---- */
+
+      .session-disclaimer {
+        font-size: 12px;
+        color: #6b7280;
+        margin-top: 12px;
+        line-height: 1.45;
+      }
+
+      .session-disclaimer strong {
+        font-weight: 600;
+      }
+
+      /* ---- Footer helper text ---- */
+
+      .session-footer-tip {
+        margin-top: 10px;
+        text-align: center;
+        font-size: 13px;
+        color: #6b7280;
+      }
+
+      /* ---- Mobile tweaks ---- */
+
+      @media (max-width: 640px) {
+        .session-page {
+          padding: 16px 10px 24px;
+          font-size: 15px;
+        }
+
+        .session-header h1 {
+          font-size: 24px;
+        }
+
+        .session-how {
+          padding: 16px 16px;
+          font-size: 15px;
+        }
+
+        .chat-row {
+          max-width: 100%;
+        }
+
+        .composer-footer {
+          align-items: flex-start;
+        }
+
+        .composer-footer .btn-primary {
+          align-self: flex-end;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="app-header-inner">
+          <div class="brand">
+            <div class="brand-mark"></div>
+            <div class="brand-text">
+              <div class="brand-title">ClosureAI</div>
+              <div class="brand-subtitle">Holiday Sanity Pass</div>
+            </div>
+          </div>
+          <div class="app-header-right">
+            <div class="badge-soft" id="header-user">
+              Signed in as <strong>—</strong>
+            </div>
+            <a href="/dashboard" class="btn btn-ghost">Back to dashboard</a>
+          </div>
+        </div>
+      </header>
+
+      <main class="app-main">
+        <div class="app-main-inner">
+          <div class="session-page">
+            <div class="session-header">
+              <h1>Start a clarity session</h1>
+              <p>
+                Pick one specific thing that’s weighing on you. We’ll unpack it
+                so your brain doesn’t have to run the 2am replay on its own.
+              </p>
+            </div>
+
+            <div class="session-how">
+              <h2>How this works</h2>
+              <p>
+                ClosureAI helps you slow down and unpack one situation at a
+                time:
+              </p>
+              <ul>
+                <li>
+                  We focus on <strong>one situation</strong> instead of
+                  everything at once.
+                </li>
+                <li>We help you organize what happened.</li>
+                <li>
+                  You leave with <strong>clearer language</strong> and grounded
+                  next steps.
+                </li>
+              </ul>
+            </div>
+
+            <section class="session-card">
+              <div class="session-card-header">
+                <strong>Your conversation</strong>
+                <span style="color:#6b7280;">
+                  · Your messages and ClosureAI’s replies will appear here.
+                </span>
+              </div>
+
+              <div class="conversation-wrapper">
+                <div class="chat-log-container">
+                  <div id="chat-log" class="chat-log">
+                    <!-- messages injected here -->
+                  </div>
+                </div>
+
+                <form id="closure-form" class="composer">
+                  <label for="narrative">
+                    What happened that you want more clarity on?
+                  </label>
+                  <textarea
+                    id="narrative"
+                    name="narrative"
+                    placeholder="For example: “My ex and I broke up six months ago, and I can’t stop replaying what I said that night…”"
+                  ></textarea>
+
+                  <div class="composer-footer">
+                    <div>
+                      <div class="tip-text">
+                        Tip: It doesn’t have to be perfect. A few honest
+                        sentences are enough. You can end the session any time
+                        by saying
+                        <strong>“I’m good for now, thank you.”</strong>
+                      </div>
+                      <div
+                        id="error-text"
+                        class="error-text"
+                        style="display:none;"
+                      ></div>
+                    </div>
+                    <button
+                      type="submit"
+                      class="btn-primary"
+                      id="submit-btn"
+                    >
+                      <span id="submit-label">Get clarity on this</span>
+                      <span
+                        id="submit-spinner"
+                        class="spinner"
+                        style="display:none;"
+                      ></span>
+                    </button>
+                  </div>
+
+                  <p class="session-disclaimer">
+                    <strong>Important:</strong> ClosureAI is not therapy and
+                    doesn’t provide medical, legal, or crisis advice. If you’re
+                    in crisis or thinking about harming yourself or others,
+                    please contact local emergency services or a crisis hotline
+                    in your area.
+                  </p>
+                </form>
+              </div>
+            </section>
+
+            <p class="session-footer-tip">
+              You can revisit this conversation in your dashboard whenever you
+              need to, or start a new clarity session if the situation shifts.
+            </p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      // ---------- Shared fetch helper ----------
+      async function fetchJSON(url, options) {
+        const res = await fetch(url, {
+          credentials: "include",
+          ...options,
+          headers: {
+            "Content-Type": "application/json",
+            ...(options && options.headers),
+          },
+        });
+
+        if (!res.ok) {
+          let text = await res.text();
+          try {
+            const json = JSON.parse(text);
+            throw new Error(json.error || json.message || res.statusText);
+          } catch {
+            throw new Error(text || res.statusText);
+          }
+        }
+
+        return res.json();
+      }
+
+      // ---------- Load current user into header ----------
+      async function loadMe() {
+        try {
+          const data = await fetchJSON("/api/me");
+          const headerUser = document.getElementById("header-user");
+          if (headerUser) {
+            headerUser.innerHTML =
+              "Signed in as <strong>" +
+              (data.email || "you") +
+              "</strong>";
+          }
+        } catch (err) {
+          console.error("Error loading /api/me:", err);
+        }
+      }
+
+      // ---------- Chat state & rendering ----------
+      const chatLogEl = document.getElementById("chat-log");
+      const formEl = document.getElementById("closure-form");
+      const textareaEl = document.getElementById("narrative");
+      const errorEl = document.getElementById("error-text");
+      const submitBtn = document.getElementById("submit-btn");
+      const submitLabel = document.getElementById("submit-label");
+      const submitSpinner = document.getElementById("submit-spinner");
+
+      // messages: [{ role: 'user'|'assistant', content: string }]
+      let messages = [];
+      let currentThreadId = null;
+
+      function setSubmitting(isSubmitting) {
+        if (!submitBtn || !submitLabel || !submitSpinner) return;
+        if (isSubmitting) {
+          submitBtn.disabled = true;
+          submitLabel.textContent = "Working…";
+          submitSpinner.style.display = "inline-block";
+        } else {
+          submitBtn.disabled = false;
+          submitLabel.textContent = "Get clarity on this";
+          submitSpinner.style.display = "none";
+        }
+      }
+
+      function renderMessages() {
+        chatLogEl.innerHTML = "";
+
+        if (!messages || messages.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "chat-empty";
+          empty.textContent =
+            "Your conversation will appear here. Start by sharing what happened below.";
+          chatLogEl.appendChild(empty);
+          return;
+        }
+
+        for (const msg of messages) {
+          const row = document.createElement("div");
+          const role = msg.role === "assistant" ? "assistant" : "user";
+          row.className = "chat-row chat-row-" + role;
+
+          const label = document.createElement("div");
+          label.className = "chat-label";
+          label.textContent = role === "user" ? "You" : "ClosureAI";
+
+          const bubble = document.createElement("div");
+          bubble.className = "chat-bubble";
+          bubble.textContent = msg.content || "";
+
+          row.appendChild(label);
+          row.appendChild(bubble);
+          chatLogEl.appendChild(row);
+        }
+
+        // Scroll to bottom
+        chatLogEl.parentElement.scrollTop =
+          chatLogEl.parentElement.scrollHeight;
+      }
+
+      // Build messages[] from /api/threads/:threadId payload
+      async function loadExistingThread(threadId) {
+        try {
+          const data = await fetchJSON(
+            "/api/threads/" + encodeURIComponent(threadId)
+          );
+
+          console.log("Loaded thread data:", data);
+
+          const rebuilt = [];
+          const rows = Array.isArray(data.messages) ? data.messages : [];
+
+          rows.forEach((row) => {
+            // USER MESSAGE
+            if (row.inputPrompt && row.inputPrompt.trim()) {
+              rebuilt.push({
+                role: "user",
+                content: row.inputPrompt.trim(),
+              });
+            }
+
+            // ASSISTANT MESSAGE
+            let assistantText =
+              (row.cleanedOutput && row.cleanedOutput.trim()) ||
+              (row.rawOutput && row.rawOutput.trim()) ||
+              "";
+
+            if (assistantText) {
+              rebuilt.push({
+                role: "assistant",
+                content: assistantText,
+              });
+            }
+          });
+
+          messages = rebuilt;
+          currentThreadId = data.threadId || threadId;
+          renderMessages();
+        } catch (err) {
+          console.error("Error loading thread:", err);
+          messages = [];
+          currentThreadId = threadId;
+          renderMessages();
+        }
+      }
+
+      // ---------- Form submit handler ----------
+      formEl.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const narrative = (textareaEl.value || "").trim();
+        errorEl.style.display = "none";
+        errorEl.textContent = "";
+
+        if (!narrative) {
+          errorEl.textContent =
+            "Please share at least a few sentences for ClosureAI to respond to.";
+          errorEl.style.display = "block";
+          return;
+        }
+
+        // Add user message locally
+        messages.push({ role: "user", content: narrative });
+        renderMessages();
+        textareaEl.value = "";
+
+        try {
+          setSubmitting(true);
+
+          const body = {
+            narrative,
+            messages,
+          };
+          if (currentThreadId) {
+            body.threadId = currentThreadId;
+          }
+
+          const data = await fetchJSON("/api/ai/closure", {
+            method: "POST",
+            body: JSON.stringify(body),
+          });
+
+          currentThreadId = data.threadId || currentThreadId;
+
+          let reply = "";
+          if (
+            typeof data.cleanedOutput === "string" &&
+            data.cleanedOutput.trim()
+          ) {
+            reply = data.cleanedOutput.trim();
+          } else if (
+            typeof data.rawOutput === "string" &&
+            data.rawOutput.trim()
+          ) {
+            reply = data.rawOutput.trim();
+          } else if (
+            typeof data.message === "string" &&
+            data.message.trim()
+          ) {
+            // Legacy fallback
+            reply = data.message.trim();
+          }
+
+          if (!reply) {
+            throw new Error("No response text returned.");
+          }
+
+          messages.push({ role: "assistant", content: reply });
+          renderMessages();
+        } catch (err) {
+          console.error("Error getting clarity:", err);
+          errorEl.textContent =
+            "We couldn’t get a response just now. Please try again in a moment.";
+          errorEl.style.display = "block";
+        } finally {
+          setSubmitting(false);
+        }
+      });
+
+      // ---------- Init ----------
+      document.addEventListener("DOMContentLoaded", () => {
+        loadMe();
+        renderMessages(); // show empty state
+
+        const params = new URLSearchParams(window.location.search);
+        const threadId = params.get("threadId");
+        if (threadId) {
+          loadExistingThread(threadId);
+        }
+      });
+    </script>
+  </body>
+</html>

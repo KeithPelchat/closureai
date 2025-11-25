@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Holiday Sanity Pass – ClosureAI</title>
+  <meta name="description" content="ClosureAI’s Holiday Sanity Pass is a quiet, AI-guided space to process holiday stress, late-night spirals, and emotional overload so you can feel calmer and clearer this season.">
+
+  <!-- Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- OG / Social -->
+  <meta property="og:title" content="ClosureAI — Holiday Sanity Pass">
+  <meta property="og:description" content="Feel less emotionally hijacked this holiday season with a calm, AI-guided space to process the stuff that keeps you up at 2am.">
+  <meta property="og:image" content="https://getclosureai.com/assets/og-closureai-holiday.png">
+  <meta property="og:url" content="https://getclosureai.com/holiday-pass">
+  <meta property="og:type" content="website">
+
+  <style>
+    :root {
+      --bg-page: #f5fafc;
+      --bg-hero-top: #fdfbff;
+      --bg-hero-bottom: #e6f4ff;
+      --bg-section-alt: #f9fbff;
+      --text-main: #0a2540;
+      --text-muted: #5e7488;
+      --border-subtle: #dde7f0;
+      --card-bg: #ffffff;
+      --accent-teal: #3bd6c6;
+      --accent-blue: #19b0fa;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-page);
+      color: var(--text-main);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1, h2, h3 {
+      margin-top: 0;
+      font-weight: 700;
+      color: #06263d;
+      letter-spacing: -0.01em;
+    }
+
+    h1 {
+      font-size: 40px;
+      line-height: 1.15;
+    }
+
+    h2 {
+      font-size: 28px;
+      line-height: 1.25;
+    }
+
+    h3 {
+      font-size: 22px;
+      line-height: 1.3;
+    }
+
+    p, li {
+      font-size: 18px;
+    }
+
+    .section {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 64px 24px;
+    }
+
+    .section-alt {
+      background: var(--bg-section-alt);
+      border-top: 1px solid rgba(221, 231, 240, 0.7);
+      border-bottom: 1px solid rgba(221, 231, 240, 0.7);
+    }
+
+    .section-inner {
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    /* Container to center the button */
+    .section-cta-block {
+      margin: 24px 0 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Styled CTA button */
+    .section-cta {
+      background: linear-gradient(135deg, #0ea5e9, #2563eb);
+      color: #ffffff;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 12px 30px rgba(37, 99, 235, 0.35);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+    }
+
+    /* Hover / active feel */
+    .section-cta:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+      box-shadow: 0 16px 38px rgba(37, 99, 235, 0.40);
+    }
+
+    .section-cta:active {
+      transform: translateY(0);
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.30);
+    }
+    
+    /* ---------- Header / Hero ---------- */
+
+    .hero-wrap {
+      background: radial-gradient(circle at top left, var(--bg-hero-top) 0, var(--bg-hero-bottom) 65%, #e1f4ff 100%);
+      border-bottom: 1px solid rgba(221, 231, 240, 0.8);
+    }
+
+    .site-header {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 18px 24px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+
+    .logo img {
+      height: 44px;
+      width: auto;
+      display: block;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 32px 24px 72px;
+    }
+
+    .hero h1 {
+      font-size: 42px;
+    }
+
+    .hero p {
+      max-width: 700px;
+      margin: 20px auto 0;
+      font-size: 20px;
+      color: var(--text-muted);
+    }
+
+    .hero-subtext {
+      margin-top: 12px;
+      font-size: 15px;
+      color: var(--text-muted);
+    }
+
+    /* ---------- Email + CTA ---------- */
+
+    .email-row {
+      margin-top: 28px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .email-input {
+      min-width: 260px;
+      max-width: 320px;
+      padding: 14px 16px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      font-size: 16px;
+      outline: none;
+      background: #ffffff;
+      color: var(--text-main);
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+    }
+
+    .email-input::placeholder {
+      color: #94a3b8;
+    }
+
+    .email-input:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 2px rgba(25, 176, 250, 0.3);
+    }
+
+    .cta-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 30px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent-teal), var(--accent-blue));
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 18px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 14px 32px rgba(15, 23, 42, 0.24);
+      transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease,
+        opacity 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .cta-btn:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
+    }
+
+    .cta-btn:active {
+      transform: translateY(0);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.2);
+    }
+
+    /* video settings */
+        .video-demo-wrap {
+      margin-top: 28px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .video-demo {
+      width: 100%;
+      max-width: 420px;
+      border-radius: 24px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+      overflow: hidden;
+      background: #000;
+    }
+
+    .video-demo video {
+      width: 100%;
+      display: block;
+    }
+
+    .video-caption {
+      font-size: 14px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    /* ---------- Cards ---------- */
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 18px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+      padding: 22px 22px 20px;
+    }
+
+    .steps {
+      display: grid;
+      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    }
+
+    .step-box {
+      background: var(--card-bg);
+      border-radius: 16px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
+      padding: 20px 20px 18px;
+    }
+
+    /* ---------- Social Proof ---------- */
+
+    .social-proof {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 60px 24px 90px;
+    }
+
+    .stats {
+      display: grid;
+      gap: 32px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      margin-top: 32px;
+    }
+
+    .stat-box {
+      background: #ffffff;
+      border-radius: 18px;
+      padding: 28px;
+      box-shadow: 0 10px 36px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 220px;
+    }
+
+    .stat-box h3 {
+      margin-top: 0;
+      margin-bottom: 6px;
+    }
+
+    .stat-box p {
+      margin-bottom: 0;
+    }
+
+    .stat-box small {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* ---------- Footer ---------- */
+
+    footer {
+      margin-top: 24px;
+      padding: 32px 24px 28px;
+      text-align: center;
+      font-size: 14px;
+      color: #7a8a9a;
+      border-top: 1px solid rgba(221, 231, 240, 0.9);
+      background: #f7fbff;
+    }
+
+    footer a {
+      color: #19b0fa;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* ---------- Responsive ---------- */
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 30px;
+      }
+
+      .hero h1 {
+        font-size: 32px;
+      }
+
+      h2 {
+        font-size: 24px;
+      }
+
+      p, li {
+        font-size: 16px;
+      }
+
+      .section {
+        padding: 48px 18px;
+      }
+
+      .hero {
+        padding: 28px 18px 56px;
+      }
+
+      .email-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .cta-btn {
+        width: 100%;
+      }
+
+      .logo img {
+        height: 36px;
+      }
+    }
+
+    @media (min-width: 1100px) {
+      .section {
+        padding-top: 72px;
+        padding-bottom: 72px;
+      }
+
+      .hero {
+        padding-bottom: 84px;
+      }
+
+      h1 {
+        font-size: 44px;
+      }
+
+      .hero h1 {
+        font-size: 46px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HERO + HEADER WRAP -->
+  <div class="hero-wrap">
+    <header class="site-header">
+      <a href="/" class="logo">
+        <img src="/assets/closureai_logo_lockup.svg" alt="ClosureAI logo">
+      </a>
+    </header>
+
+    <section class="hero section" aria-labelledby="hero-title">
+      <div class="section-inner">
+        <h1 id="hero-title">Feel less emotionally hijacked this holiday season</h1>
+        <p>
+          A quiet, AI-guided space to process the stuff that keeps you up at 2am —
+          You don't want to be "fixed". You don't want opinions.<br />You just want clarity.
+        </p>
+
+        <div class="email-row" id="hero-cta">
+          <input
+            id="checkout-email"
+            class="email-input"
+            type="email"
+            placeholder="you@example.com"
+            autocomplete="email"
+          />
+          <button type="button" id="holidaypass-cta" class="cta-btn" onclick="startCheckout()">
+            Get My Holiday Sanity Pass — $29
+          </button>
+        </div>
+
+        <p class="hero-subtext">
+          One-time payment. Pass runs through early January. You’ll go to a secure checkout page next.
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <main>
+    <!-- PROBLEM -->
+    <section class="section section-alt">
+      <div class="section-inner">
+        <h2>The real problem isn’t your family.</h2>
+        <p>
+          Ok. Well, it might be! But it’s also your nervous system trying to juggle a year's worth of unresolved emotional tabs while 
+          the holiday soundtrack will not shut up.
+        </p>
+      </div>
+    </section>
+
+    <!-- FAILURE -->
+    <section class="section">
+      <div class="section-inner">
+        <h2>If you keep trying to “power through”… you already know how that ends.</h2>
+        <ul>
+          <li>2am brain spirals about things you can’t change from 2017.</li>
+          <li>Snapping at people you actually care about because your bandwidth is gone.</li>
+          <li>Dragging guilt, resentment, or confusion into January… again.</li>
+          <li>You curled up in the fetal position with a quart of icecream and a spoon!</li>
+        </ul>
+        <p>
+          This isn’t about you being “too sensitive.”  
+          It’s about trying to sort out the emotional stuff you’ve been carrying with nowhere safe to put it.
+        </p>
+      </div>
+      <div class="section-cta-block">
+        <button type="button" class="section-cta scroll-to-cta">
+          Get Your Holiday Sanity Pass
+        </button>
+      </div>
+    </section>
+
+    <!-- SUCCESS -->
+    <section class="section section-alt">
+      <div class="section-inner">
+        <h2>Imagine walking into gatherings already clear on your own story.</h2>
+        <p>
+          Same family. Same texts.  
+          But <em>you</em> feel more steady — because you gave yourself space to sort things out.
+        </p>
+        <ul>
+          <li>Know what you'll say (and what you’re simply not available for).</li>
+          <li>Fewer nights stuck replaying the same scenes on repeat.</li>
+          <li>Start January feeling lighter and clearer about what actually matters.</li>
+          <li>Uncle Jimmy goes home feeling unsatisfied because he couldn't get under your skin</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- GUIDE -->
+    <section class="section">
+      <div class="section-inner">
+        <div class="card">
+          <h2>ClosureAI gives you a structured place to work through emotional momements so you can understand what's going on and decide what comes next.</h2>
+          <p>
+            You're the hero of the story.  
+            ClosureAI simply helps you process the messy chapters so your brain can stop yelling:
+            <em>“We need a meeting about this.”</em>
+          </p>
+          <ul>
+            <li>Lay out what actually happened (without spiraling).</li>
+            <li>See the situation from a clearåer, more grounded angle.</li>
+            <li>Find language for what you’re feeling so you’re not arguing with yourself.</li>
+            <li>Get gentle next steps — even if that’s just “breathe and don’t text back tonight.”</li>
+          </ul>
+          <p style="font-size:14px;color:#789;margin-top:20px;">
+            ClosureAI is not a substitute for therapy or medical care and does not provide
+            medical, legal, or crisis advice. If you are in crisis or thinking about harming
+            yourself or others, please contact local emergency services or a crisis hotline
+            in your area.
+          </p>
+
+          <!-- Demo video -->
+          <div class="video-demo-wrap">
+            <div class="video-demo">
+              <video
+                src="/homepagedemo.mp4"
+                controls
+                playsinline
+                muted
+              ></video>
+            </div>
+          </div>
+          <div class="video-caption">
+            Quick peek: what it looks like to grab your Holiday Sanity Pass and start a session.
+          </div>
+        </div>
+
+        <div class="section-cta-block">
+          <button type="button" class="section-cta scroll-to-cta">
+            Get Your Holiday Sanity Pass
+          </button>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- PLAN -->
+    <section class="social-proof">
+      <h2>Holiday stress is real — and measurable.</h2>
+      <div class="stats">
+
+        <div class="stat-box">
+          <h3>89% of U.S. adults</h3>
+          <p>
+            say they feel stressed during the holiday season, and 41% report higher
+            stress than at other times of the year.<br>
+            <small>— American Psychological Association survey</small>
+          </p>
+        </div>
+
+        <div class="stat-box">
+          <h3>62% of people</h3>
+          <p>
+            describe their holiday stress as “very” or “somewhat” elevated, while only
+            10% say they feel no holiday stress at all.<br>
+            <small>— Healthline holiday stress survey</small>
+          </p>
+        </div>
+
+        <div class="stat-box">
+          <h3>Nearly 3 in 10</h3>
+          <p>
+            say they get less sleep around the holidays, as stress and routines shift.<br>
+            <small>— U.S. holiday sleep survey data</small>
+          </p>
+        </div>
+
+        <div class="stat-box">
+          <h3>52% of people</h3>
+          <p>
+            say the holidays make them feel emotionally overwhelmed at least once during the season.<br>
+            <small>— Verywell Mind Holiday Stress Poll</small>
+          </p>
+        </div>
+
+      </div>
+      <div class="section-cta-block">
+        <button type="button" class="section-cta scroll-to-cta">
+          Get Your Holiday Sanity Pass
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <p style="margin:0 0 4px;">
+      © 2025 ClosureAI. All rights reserved. A product of More Leads Online LLC.
+    </p>
+    <p style="margin:0 0 4px;font-size:13px;color:#7a8a9a;">
+      ClosureAI is not a substitute for therapy or medical care and does not provide
+      medical, legal, or crisis advice. If you are in crisis, please contact local
+      emergency services or a crisis hotline in your area.
+    </p>
+    <p style="margin:8px 0 0;font-size:13px;">
+      <a href="/terms">Terms &amp; Conditions</a>
+      &nbsp;·&nbsp;
+      <a href="/privacy">Privacy Policy</a>
+      &nbsp;·&nbsp;
+      <a href="/disclaimer">Disclaimer</a>
+    </p>
+  </footer>
+
+  <script>
+    async function startCheckout() {
+      const input = document.getElementById("checkout-email");
+      if (!input) {
+        alert("Checkout form not found.");
+        return;
+      }
+
+      const email = input.value.trim();
+      if (!email) {
+        alert("Please enter your email.");
+        input.focus();
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/create-checkout-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email })
+        });
+
+        if (!res.ok) {
+          console.error("Checkout session error:", res.status);
+          alert("Something went wrong starting checkout. Please try again.");
+          return;
+        }
+
+        const data = await res.json();
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          console.error("No URL returned from checkout session:", data);
+          alert("Could not start checkout. Please try again.");
+        }
+      } catch (err) {
+        console.error("Error calling /api/create-checkout-session:", err);
+        alert("Network error. Please check your connection and try again.");
+      }
+    }
+
+    // kept in case you add a bottom CTA later
+    function scrollToHeroCta() {
+      const hero = document.getElementById("hero-cta");
+      if (!hero) return;
+      hero.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      const input = document.getElementById("checkout-email");
+      if (input) {
+        setTimeout(() => input.focus(), 400);
+      }
+    }
+  </script>
+  <script>
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".scroll-to-cta");
+    if (!btn) return;
+
+    e.preventDefault();
+
+    const target = document.getElementById("holidaypass-cta");
+    if (!target) return;
+
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+</script>
+
+</body>
+</html>

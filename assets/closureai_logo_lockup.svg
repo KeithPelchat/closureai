@@ -1,0 +1,14 @@
+<svg width="340" height="90" viewBox="0 0 340 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="closureAIgrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#19B0FA"/>
+      <stop offset="100%" stop-color="#3BD6C6"/>
+    </linearGradient>
+  </defs>
+  <circle cx="45" cy="45" r="28" stroke="url(#closureAIgrad2)" stroke-width="2.25"/>
+  <circle cx="45" cy="45" r="19" stroke="url(#closureAIgrad2)" stroke-width="2.25"/>
+  <circle cx="45" cy="45" r="10" stroke="url(#closureAIgrad2)" stroke-width="2.25"/>
+  <text x="95" y="55" fill="#1A1A1A" font-family="Inter, sans-serif" font-weight="600" font-size="34">
+    ClosureAI
+  </text>
+</svg>

@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ClosureAI – Holiday Sanity Pass</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/styles.css" />
+
+    <style>
+      /* --------- Global layout & typography polish --------- */
+
+      body {
+        color: #0f172a;
+      }
+
+      .app-main-inner {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 24px 16px 40px;
+      }
+
+      .card {
+        border-radius: 22px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 18px 48px rgba(15, 23, 42, 0.06);
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .card-title {
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+
+      .card-subtitle {
+        font-size: 14px;
+        color: #64748b;
+        line-height: 1.5;
+      }
+
+      .badge-soft {
+        font-size: 13px;
+      }
+
+      /* Header: keep pills neat */
+      .app-header-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      #logout-btn {
+        border-radius: 999px;
+        padding-inline: 14px;
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      /* --------- Welcome card polish --------- */
+
+      /* First card = Welcome */
+      .card:first-of-type .card-header {
+        align-items: center;
+      }
+
+      .card:first-of-type .card-title {
+        font-size: 22px;
+      }
+
+      .card:first-of-type .card-subtitle {
+        font-size: 15px;
+        color: #475569;
+      }
+
+      .card:first-of-type .btn.btn-primary {
+        border-radius: 999px;
+        padding: 12px 20px;
+        font-size: 14px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .pass-banner {
+        margin-top: 14px;
+        font-size: 13px;
+        color: #475569;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .pass-banner .pass-text {
+        white-space: normal;
+      }
+
+      /* --------- Recent sessions polish (both desktop + mobile base) --------- */
+
+      #sessions-list {
+        margin-top: 4px;
+      }
+
+      .session-row {
+        padding: 12px 0;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .session-title {
+        font-size: 15px;
+        line-height: 1.45;
+        color: #0f172a;
+        font-weight: 500;
+      }
+
+      .session-meta {
+        font-size: 13px;
+        color: #64748b;
+        margin-top: 2px;
+      }
+
+      .session-actions {
+        flex-shrink: 0;
+      }
+
+      .session-actions .btn {
+        padding: 6px 14px;
+        font-size: 14px;
+        border-radius: 999px;
+      }
+
+      #sessions-empty {
+        font-size: 14px;
+        color: #64748b;
+      }
+
+      #sessions-error {
+        font-size: 13px;
+      }
+
+      /* --------- Mobile polish --------- */
+
+      @media (max-width: 640px) {
+        .app-main-inner {
+          padding: 16px 10px 32px;
+        }
+
+        /* Stack header pills if needed */
+        .app-header-inner {
+          padding-inline: 10px;
+        }
+
+        /* Welcome card stacks text + CTA */
+        .card:first-of-type .card-header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 12px;
+        }
+
+        .card:first-of-type .card-title {
+          font-size: 20px;
+        }
+
+        .card:first-of-type .card-subtitle {
+          font-size: 14px;
+        }
+
+        .card:first-of-type .btn.btn-primary {
+          align-self: stretch;
+          width: 100%;
+          text-align: center;
+        }
+
+        .pass-banner {
+          flex-wrap: wrap;
+          align-items: flex-start;
+          row-gap: 4px;
+        }
+
+        /* Recent sessions header */
+        .card:nth-of-type(2) .card-title {
+          font-size: 20px;
+          margin-bottom: 2px;
+        }
+
+        .card:nth-of-type(2) .card-subtitle {
+          font-size: 14px;
+          color: #475569;
+        }
+
+        /* Session rows become vertical stack */
+        .session-row {
+          padding: 14px 0;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .session-actions {
+          width: 100%;
+          margin-top: 2px;
+        }
+
+        .session-actions .btn {
+          width: 100%;
+          justify-content: center;
+          border-radius: 10px;
+          border: 1px solid #cbd5e1;
+          background: #f8fafc;
+          color: #0f172a;
+        }
+
+        .session-actions .btn:hover {
+          background: #f1f5f9;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="app-header-inner">
+          <div class="brand">
+            <div class="brand-mark"></div>
+            <div class="brand-text">
+              <div class="brand-title">ClosureAI</div>
+              <div class="brand-subtitle">Holiday Sanity Pass</div>
+            </div>
+          </div>
+          <div class="app-header-right">
+            <div class="badge-soft" id="header-user">
+              Signed in as <strong>—</strong>
+            </div>
+            <button id="logout-btn" class="btn btn-ghost">Log out</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="app-main">
+        <div class="app-main-inner">
+          <!-- Welcome card -->
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Welcome back</div>
+                <div class="card-subtitle">
+                  Pick up where you left off, or start a new clarity session
+                  for whatever your brain is replaying today.
+                </div>
+              </div>
+              <a href="/session" class="btn btn-primary">
+                Start new clarity session
+              </a>
+            </div>
+
+            <div class="pass-banner" id="pass-banner">
+              <span class="badge-soft badge-soft-success">
+                Holiday Sanity Pass active
+              </span>
+              <span class="pass-text">
+                · expires <span id="pass-expires-text">—</span>
+              </span>
+            </div>
+          </section>
+
+          <!-- Recent sessions card -->
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Recent clarity sessions</div>
+                <div class="card-subtitle">
+                  A quick look at the situations you’ve already unpacked.
+                </div>
+              </div>
+              <button
+                id="refresh-sessions"
+                type="button"
+                class="btn btn-ghost"
+              >
+                Refresh
+              </button>
+            </div>
+
+            <div id="sessions-container">
+              <p
+                id="sessions-empty"
+                class="helper-text"
+                style="margin-top: 0;"
+              >
+                No clarity sessions yet. Once you run a session, you’ll see a
+                short summary here so you can revisit it any time.
+              </p>
+
+              <ul id="sessions-list" class="session-list"></ul>
+
+              <p
+                id="sessions-error"
+                class="helper-text"
+                style="color: #b91c1c; display: none; margin-top: 8px;"
+              ></p>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      async function fetchJSON(url, options) {
+        const res = await fetch(url, {
+          credentials: "include",
+          ...options,
+          headers: {
+            "Content-Type": "application/json",
+            ...(options && options.headers),
+          },
+        });
+
+        if (!res.ok) {
+          let text = await res.text();
+          try {
+            const json = JSON.parse(text);
+            throw new Error(json.error || json.message || res.statusText);
+          } catch {
+            throw new Error(text || res.statusText);
+          }
+        }
+
+        return res.json();
+      }
+
+      function formatDateTime(iso) {
+        if (!iso) return "";
+        const d = new Date(iso);
+        return d.toLocaleString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        });
+      }
+
+      async function loadMe() {
+        try {
+          const data = await fetchJSON("/api/me");
+          const headerUser = document.getElementById("header-user");
+          const passBanner = document.getElementById("pass-banner");
+          const passExpiresText = document.getElementById(
+            "pass-expires-text"
+          );
+
+          if (headerUser) {
+            headerUser.innerHTML =
+              "Signed in as <strong>" +
+              (data.email || data.name || "you") +
+              "</strong>";
+          }
+
+          if (data.holidayPassActive) {
+            if (passBanner) passBanner.style.display = "flex";
+            if (passExpiresText && data.holidayPassExpiresAt) {
+              passExpiresText.textContent = formatDateTime(
+                data.holidayPassExpiresAt
+              );
+            }
+          } else {
+            if (passBanner) {
+              passBanner.innerHTML =
+                '<span class="badge-soft badge-soft-danger">Holiday Sanity Pass expired</span>' +
+                '<span class="pass-text"> · renew to keep using ClosureAI</span>';
+            }
+          }
+        } catch (err) {
+          console.error("Error loading /api/me:", err);
+        }
+      }
+
+      async function loadSessions() {
+        const listEl = document.getElementById("sessions-list");
+        const emptyEl = document.getElementById("sessions-empty");
+        const errorEl = document.getElementById("sessions-error");
+
+        if (!listEl) return;
+
+        listEl.innerHTML = "";
+        errorEl.style.display = "none";
+        errorEl.textContent = "";
+
+        try {
+          const data = await fetchJSON("/api/sessions?limit=20");
+          const sessions = Array.isArray(data)
+            ? data
+            : Array.isArray(data.sessions)
+            ? data.sessions
+            : [];
+
+          if (!sessions.length) {
+            emptyEl.style.display = "block";
+            return;
+          }
+
+          emptyEl.style.display = "none";
+
+          sessions.forEach((session) => {
+            const li = document.createElement("li");
+            li.className = "session-row";
+
+            const textWrap = document.createElement("div");
+            textWrap.style.flex = "1";
+
+            const title = document.createElement("div");
+            title.className = "session-title";
+            title.textContent = session.title || "Clarity session";
+
+            const meta = document.createElement("div");
+            meta.className = "session-meta";
+            meta.textContent = session.lastUpdatedAt
+              ? formatDateTime(session.lastUpdatedAt)
+              : "";
+
+            textWrap.appendChild(title);
+            textWrap.appendChild(meta);
+
+            const actions = document.createElement("div");
+            actions.className = "session-actions";
+            const openLink = document.createElement("a");
+            openLink.href =
+              "/session?threadId=" + encodeURIComponent(session.threadId);
+            openLink.className = "btn btn-ghost btn-sm";
+            openLink.textContent = "Open";
+            actions.appendChild(openLink);
+
+            li.appendChild(textWrap);
+            li.appendChild(actions);
+            listEl.appendChild(li);
+          });
+        } catch (err) {
+          console.error("Error loading sessions:", err);
+          errorEl.textContent =
+            "We couldn’t load your recent sessions just now. Please try again in a moment.";
+          errorEl.style.display = "block";
+          emptyEl.style.display = "none";
+        }
+      }
+
+      async function handleLogout() {
+        try {
+          await fetch("/auth/logout", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+        } catch (e) {
+          console.error("Error during logout:", e);
+        } finally {
+          window.location.href = "/login";
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        loadMe();
+        loadSessions();
+
+        const refreshBtn = document.getElementById("refresh-sessions");
+        if (refreshBtn) {
+          refreshBtn.addEventListener("click", () => {
+            loadSessions();
+          });
+        }
+
+        const logoutBtn = document.getElementById("logout-btn");
+        if (logoutBtn) {
+          logoutBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            handleLogout();
+          });
+        }
+      });
+    </script>
+  </body>
+</html>
