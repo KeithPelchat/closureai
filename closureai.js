@@ -13,6 +13,8 @@ const https = require("https");
 const APP_CONFIG = require("./config/appConfig");
 const PROMPTS_CONFIG = require("./config/promptsConfig");
 const STRIPE_CONFIG = require("./config/stripeConfig");
+const UI_CONFIG = require("./config/uiConfig");
+
 
 
 const db = require("./db");
@@ -44,22 +46,9 @@ app.use("/assets", express.static(path.join(__dirname, "assets")));
 // ---------------------------------------------------------------------
 app.get("/", (req, res) => {
   const filePath = path.join(__dirname, "public", "default.html");
-
-  fs.readFile(filePath, "utf8", (err, html) => {
-    if (err) {
-      console.error("Error reading default.html:", err);
-      return res.status(500).send("Error loading app.");
-    }
-
-    const rendered = html
-      .replace(/{{APP_NAME}}/g, APP_CONFIG.appName)
-      .replace(/{{THEME_COLOR}}/g, APP_CONFIG.themeColor)
-      .replace(/{{APP_ICON_192}}/g, APP_CONFIG.appIcon192)
-      .replace(/{{APP_LOGO}}/g, APP_CONFIG.appLogo);
-
-    res.send(rendered);
-  });
+  renderHtmlTemplate(res, filePath);
 });
+
 
 // ---------------------------------------------------------------------
 // Config
@@ -231,6 +220,67 @@ async function createMagicLink(userId) {
 
   return `${APP_CONFIG.baseUrl}/login/${token}`;
 }
+
+// ---------------------------------------------------------------------
+// Simple HTML templating helper for views / public shells
+// ---------------------------------------------------------------------
+
+function getTemplateTokens(extraTokens = {}) {
+  return {
+    // Core app tokens (already used in default.html/login.html)
+    APP_NAME: APP_CONFIG.appName,
+    THEME_COLOR: APP_CONFIG.themeColor,
+    APP_ICON_192: APP_CONFIG.appIcon192,
+    APP_LOGO: APP_CONFIG.appLogo,
+    HOLIDAY_PASS_NAME: APP_CONFIG.holidayPassName,
+
+    // High-level branding
+    APP_TAGLINE: UI_CONFIG.app.tagline,
+    PRIMARY_CTA_LABEL: UI_CONFIG.app.primaryCtaLabel,
+
+    // Login page copy
+    LOGIN_HEADLINE: UI_CONFIG.loginPage.headline,
+    LOGIN_SUBHEADLINE: UI_CONFIG.loginPage.subheadline,
+
+    // Dashboard copy
+    DASHBOARD_TITLE: UI_CONFIG.dashboardPage.title,
+    DASHBOARD_EMPTY_TITLE: UI_CONFIG.dashboardPage.emptyStateTitle,
+    DASHBOARD_EMPTY_BODY: UI_CONFIG.dashboardPage.emptyStateBody,
+
+    // Session page copy
+    SESSION_TITLE: UI_CONFIG.sessionPage.title,
+    SESSION_INTRO: UI_CONFIG.sessionPage.intro,
+
+    // Holiday pass page copy
+    HOLIDAY_HEADLINE: UI_CONFIG.holidayPassPage.headline,
+    HOLIDAY_SUBHEADLINE: UI_CONFIG.holidayPassPage.subheadline,
+
+    // Allow per-call overrides
+    ...extraTokens,
+  };
+}
+
+function renderHtmlTemplate(res, filePath, extraTokens = {}) {
+  fs.readFile(filePath, "utf8", (err, html) => {
+    if (err) {
+      console.error("Error reading template:", filePath, err);
+      return res.status(500).send("Error loading page.");
+    }
+
+    const tokens = getTemplateTokens(extraTokens);
+
+    let rendered = html;
+    for (const [key, value] of Object.entries(tokens)) {
+      const safeVal = value == null ? "" : String(value);
+      // Replace all {{KEY}} instances
+      const pattern = new RegExp(`{{${key}}}`, "g");
+      rendered = rendered.replace(pattern, safeVal);
+    }
+
+    res.send(rendered);
+  });
+}
+
 
 // ---------------------------------------------------------------------
 // Auth middleware (JWT + Holiday Pass enforcement)
@@ -471,22 +521,9 @@ app.get("/coach", (req, res) => {
 // Login page → templated login.html
 app.get("/login", (req, res) => {
   const filePath = path.join(__dirname, "public", "login.html");
-
-  fs.readFile(filePath, "utf8", (err, html) => {
-    if (err) {
-      console.error("Error reading login.html:", err);
-      return res.status(500).send("Error loading login page.");
-    }
-
-    const rendered = html
-      .replace(/{{APP_NAME}}/g, APP_CONFIG.appName)
-      .replace(/{{THEME_COLOR}}/g, APP_CONFIG.themeColor)
-      .replace(/{{APP_ICON_192}}/g, APP_CONFIG.appIcon192)
-      .replace(/{{APP_LOGO}}/g, APP_CONFIG.appLogo);
-
-    res.send(rendered);
-  });
+  renderHtmlTemplate(res, filePath);
 });
+
 
 // ---------------------------------------------------------------------
 // Auth status & Secure Link auth
@@ -846,17 +883,20 @@ app.get("/cancelled", (req, res) => {
 
 // Dashboard (protected)
 app.get("/dashboard", requireAuth, (req, res) => {
-  return res.sendFile(path.join(__dirname, "views", "dashboard.html"));
+  const filePath = path.join(__dirname, "views", "dashboard.html");
+  renderHtmlTemplate(res, filePath);
 });
 
 // Session page (protected)
 app.get("/session", requireAuth, (req, res) => {
-  return res.sendFile(path.join(__dirname, "views", "session.html"));
+  const filePath = path.join(__dirname, "views", "session.html");
+  renderHtmlTemplate(res, filePath);
 });
 
 // Holiday pass funnel
 app.get("/holiday-pass", (req, res) => {
-  return res.sendFile(path.join(__dirname, "views", "holiday-pass.html"));
+  const filePath = path.join(__dirname, "views", "holiday-pass.html");
+  renderHtmlTemplate(res, filePath);
 });
 
 // =========================
