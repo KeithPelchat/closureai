@@ -9,7 +9,9 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 const https = require("https");
+
 const APP_CONFIG = require("./config/appConfig");
+const PROMPTS_CONFIG = require("./config/promptsConfig");
 
 const db = require("./db");
 const { sendMagicLinkEmail } = require("./email/sesEmail");
@@ -55,148 +57,20 @@ app.get("/", (req, res) => {
 // ---------------------------------------------------------------------
 const PORT = process.env.PORT || 3200;
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
-const APP_BASE_URL =
-  process.env.APP_BASE_URL || "https://app.getclosureai.com";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 // Google OAuth
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
-const GOOGLE_REDIRECT_URI =
-  process.env.GOOGLE_REDIRECT_URI || "";
-
-// ---------------------------------------------------------------------
-// System prompt (unchanged ClosureAI behavior)
-// ---------------------------------------------------------------------
-const CLOSUREAI_SYSTEM_PROMPT = `
-You are ClosureAI, an AI-guided reflection space for the "Holiday Sanity Pass."
-Your job is NOT to give quick answers. Your job is to help the user slow down,
-organize what happened, notice what it brings up for them, and leave with
-clearer language and grounded next steps.
-
-Critical constraints:
-- You are NOT a therapist or medical professional.
-- You do NOT diagnose, treat, or offer medical, legal, or crisis advice.
-- If the user mentions self-harm, harm to others, or a crisis, you gently
-  encourage them to contact local emergency services or a crisis hotline and
-  avoid giving specific advice.
-- You never say you are “providing therapy,” “counseling,” or “treatment.”
-
-Tone:
-- Calm, warm, steady, and human.
-- A little wry or lightly humorous is okay when appropriate, but never mocking.
-- Plain language, short paragraphs, no jargon.
-- You sound like a grounded, emotionally intelligent friend, not a clinician.
-
-Early wrap-up / “I’m good” rules:
-- At ANY point, if the user clearly says they:
-    * feel clearer now,
-    * feel better,
-    * are good for now,
-    * want to stop, wrap up, or end the session,
-  then:
-    1) DO NOT ask more exploratory questions.
-    2) Give a short recap of what they discovered or decided.
-    3) Name 1–2 key phrases, mindsets, or next steps they might want to remember.
-    4) Offer a brief, encouraging send-off.
-    5) Invite them to start a new session another time if things flare up again.
-- Examples of things that should trigger wrap-up mode:
-    * “That actually helps a lot, I think I’m good for now.”
-    * “I feel a lot better.”
-    * “This is enough for tonight, thank you.”
-- In wrap-up mode, responses are concise and do NOT contain new probing questions.
-
-Overall structure for a session:
-
-1) FIRST RESPONSE after the user shares a situation:
-   - Acknowledge and normalize how big or messy this can feel.
-   - Briefly reflect what you heard: key facts + emotions.
-   - Do NOT jump straight into “here’s what you should do.”
-   - Ask 2–3 short, concrete questions that will help you understand:
-        * context (who, when, what’s the setup)
-        * why this matters to them
-        * what hurts or scares them the most
-   - Make it clear that these questions are to help them get a clearer story,
-     not to judge them.
-   - End by inviting them to answer in their own words.
-   - Optional: you may briefly mention that they can say something like
-     “I’m good for now, can we wrap this up?” if they ever feel done.
-
-2) SECOND RESPONSE (after they answer those questions), IF they have not
-   asked to wrap up:
-   - Start with: “Here’s what I’m hearing:” and give a short, structured
-     summary (bullet points are great).
-   - Name patterns or tensions you notice (e.g., “you’re trying to be kind
-     to them and kind to yourself at the same time, and that puts you in
-     the middle.”).
-   - Ask 1 deeper question to help them connect to what really matters, such as:
-        * “What feels most important for you to protect in this situation?”
-        * “What part of this is bothering you the most tonight?”
-        * “If this played out in a way that felt okay, what would that look like?”
-   - Keep this response under about 250–350 words.
-
-3) LATER RESPONSES (once there is enough context, usually after 2+ turns),
-   IF they have not asked to wrap up and you are not on your final turn:
-   - Offer a calm reframe: another way of seeing the situation that reduces
-     shame and panic without minimizing their experience.
-   - Present 2–3 grounded options or “next steps,” clearly labeled, for example:
-        Option 1 – A gentle, low-drama response tonight
-        Option 2 – A firmer boundary if you need more space
-        Option 3 – No outward action, just an internal decision for now
-   - Where helpful, provide 1–3 short “language prompts” the user could adapt
-     (e.g., “If you want to say no without a big speech, you might try
-     something like: ‘Hey, I care about you, but I don’t have the bandwidth
-     for this conversation tonight.’”).
-   - Emphasize choice: you’re not telling them what to do; you are giving
-     them clearer options so they can decide.
-   - End with a tiny closure prompt, such as:
-        * “What feels a little clearer now?”
-        * “What do you want to remember from this when your brain starts
-           replaying it at 2am?”
-
-4) FINAL TURN behavior:
-   - Sometimes the system will treat a response as a final turn after several
-     back-and-forth messages, even if the user hasn’t explicitly said “I’m done.”
-   - On a final turn, behave JUST LIKE the early wrap-up mode:
-        * recap the story and key insights,
-        * highlight 1–3 options or next steps,
-        * give 1–2 phrases or mindsets they can lean on later,
-        * end with a gentle, encouraging close.
-   - Do NOT ask new exploratory questions on a final turn.
-
-Content style guidelines:
-- Use headings and bullet points where it helps readability.
-- Avoid long walls of text.
-- Do not bring up childhood, diagnoses, or labels unless the user explicitly
-  mentions them and even then, do not speculate.
-- Never claim certainty about other people’s motives; talk in terms of
-  possibilities (“it could be that…,” “one way to read that is…”).
-- Do not encourage big, impulsive decisions. Prioritize small, reversible
-  next steps the user can take tonight or this week.
-
-Session “worth $49” test:
-- The user should leave feeling:
-    * more organized about what happened,
-    * more compassionate toward themselves,
-    * clearer on 1–3 possible next moves,
-    * and with at least one phrase or mental frame that calms their brain.
-- If your response looks like a simple one-shot answer or advice column,
-  slow down, ask better questions, and guide them deeper instead.
-`;
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || "";
 
 // ---------------------------------------------------------------------
 // CORS (safe for everything, including Stripe)
 // ---------------------------------------------------------------------
-const allowedOrigins = [
-  "https://app.getclosureai.com",
-  "https://getclosureai.com",
-  "https://www.getclosureai.com",
-];
-
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || APP_CONFIG.allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
       return callback(new Error("Not allowed by CORS: " + origin));
@@ -252,7 +126,7 @@ app.post(
 app.use(express.json());
 app.use(cookieParser());
 
-// Serve static assets (CSS/JS/images) if/when you add them
+// Serve static assets (CSS/JS/images)
 app.use(express.static(path.join(__dirname, "public")));
 
 // ---------------------------------------------------------------------
@@ -346,7 +220,7 @@ async function createMagicLink(userId) {
     [uuidv4(), userId, token, expires]
   );
 
-  return `${APP_BASE_URL}/login/${token}`;
+  return `${APP_CONFIG.baseUrl}/login/${token}`;
 }
 
 // ---------------------------------------------------------------------
@@ -416,7 +290,7 @@ function respondHolidayPassExpired(req, res) {
     return res.status(403).json({
       ok: false,
       code: "HOLIDAY_PASS_EXPIRED",
-      message: "Your Holiday Pass has expired.",
+      message: `Your ${APP_CONFIG.holidayPassName} has expired.`,
       data: {
         holidayPassActive: false,
         holidayPassExpiresAt: expiresAt,
@@ -436,7 +310,7 @@ function respondHolidayPassExpired(req, res) {
       <html>
         <head>
           <meta charset="utf-8" />
-          <title>ClosureAI – Holiday Pass expired</title>
+          <title>${APP_CONFIG.appName} – ${APP_CONFIG.holidayPassName} expired</title>
           <style>
             body {
               margin: 0;
@@ -473,11 +347,11 @@ function respondHolidayPassExpired(req, res) {
         </head>
         <body>
           <div class="card">
-            <h1>Holiday Pass expired</h1>
-            <p>Your ClosureAI Holiday Pass expired ${expiresText}.</p>
-            <p>To keep using ClosureAI, you’ll need to renew your pass.</p>
+            <h1>${APP_CONFIG.holidayPassName} expired</h1>
+            <p>Your ${APP_CONFIG.appName} ${APP_CONFIG.holidayPassName} expired ${expiresText}.</p>
+            <p>To keep using ${APP_CONFIG.appName}, you’ll need to renew your pass.</p>
             <!-- TODO: Replace with your renewal funnel when ready -->
-            <a href="/holiday-pass">Renew Holiday Pass</a>
+            <a href="${APP_CONFIG.renewalPath}">Renew ${APP_CONFIG.holidayPassName}</a>
           </div>
         </body>
       </html>
@@ -526,7 +400,7 @@ async function ensureUserWithHolidayPassFromSession(session) {
   );
 
   console.log(
-    `🎟️ Holiday Pass granted to ${user.email} until ${expiresAt.toISOString()}`
+    `🎟️ ${APP_CONFIG.holidayPassName} granted to ${user.email} until ${expiresAt.toISOString()}`
   );
 
   // Update user object in memory to reflect expiry
@@ -561,7 +435,7 @@ async function handlePaidUser(session) {
 
 // Health check
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", app: "ClosureAI" });
+  res.json({ status: "ok", app: APP_CONFIG.appName });
 });
 
 // Static informational pages
@@ -709,7 +583,7 @@ app.get("/auth/google", (req, res) => {
   return res.redirect(authUrl.toString());
 });
 
-// Google OAuth callback
+// Google OAuth callback (single, de-duplicated implementation)
 app.get("/auth/google/callback", async (req, res) => {
   const { code, error, error_description } = req.query;
 
@@ -810,7 +684,6 @@ app.get("/auth/google/callback", async (req, res) => {
       expiresIn: "30d",
     });
 
-    // Centralize cookie options if you want, but inline is fine:
     res.cookie("closureai_auth", jwtToken, {
       httpOnly: true,
       secure: true,
@@ -832,86 +705,6 @@ app.get("/auth/google/callback", async (req, res) => {
     return res
       .status(500)
       .send("Google login failed unexpectedly. Please try again.");
-  }
-});
-
-// Google OAuth callback
-app.get("/auth/google/callback", async (req, res) => {
-  const { code } = req.query;
-
-  if (!code) {
-    return res.status(400).send("Missing authorization code from Google.");
-  }
-
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI) {
-    console.error("Google OAuth env vars not set");
-    return res.status(500).send("Google login not configured.");
-  }
-
-  try {
-    // Exchange code for tokens (Node 18+ global fetch)
-    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        code: String(code),
-        client_id: GOOGLE_CLIENT_ID,
-        client_secret: GOOGLE_CLIENT_SECRET,
-        redirect_uri: GOOGLE_REDIRECT_URI,
-        grant_type: "authorization_code",
-      }),
-    });
-
-    if (!tokenRes.ok) {
-      const text = await tokenRes.text();
-      console.error("Google token error:", text);
-      return res.status(500).send("Error exchanging code with Google.");
-    }
-
-    const tokenData = await tokenRes.json();
-    const idToken = tokenData.id_token;
-
-    if (!idToken) {
-      console.error("No id_token in Google response:", tokenData);
-      return res.status(500).send("Google did not return an ID token.");
-    }
-
-    // Decode ID token payload (basic decode; production should also verify signature)
-    const [, payloadB64] = idToken.split(".");
-    const payloadJson = Buffer.from(payloadB64, "base64").toString("utf8");
-    const payload = JSON.parse(payloadJson);
-
-    const email = payload.email;
-    const name = payload.name || payload.given_name || null;
-
-    if (!email) {
-      console.error("No email in Google ID token:", payload);
-      return res.status(500).send("Google account has no email.");
-    }
-
-    const user = await findOrCreateUser({
-      email,
-      name,
-      ghlContactId: null,
-    });
-
-    const jwtToken = jwt.sign({ userId: user.id }, JWT_SECRET, {
-      expiresIn: "30d",
-    });
-
-    res.cookie("closureai_auth", jwtToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
-
-    return res.redirect("/");
-  } catch (err) {
-    console.error("Error in /auth/google/callback:", err);
-    return res.status(500).send("Google login failed. Please try again.");
   }
 });
 
@@ -1212,8 +1005,6 @@ app.get("/api/threads/:threadId", requireAuth, async (req, res) => {
 // OpenAI helper
 // ---------------------------------------------------------------------
 
-const MAX_ASSISTANT_TURNS = 8;
-
 function countAssistantTurns(history) {
   return (history || []).filter((m) => m.role === "assistant").length;
 }
@@ -1228,9 +1019,10 @@ async function callOpenAIForClosure(conversationMessages, assistantTurnsParam) {
       ? assistantTurnsParam
       : countAssistantTurns(history);
 
-  const isWrapUpTurn = assistantTurns >= MAX_ASSISTANT_TURNS - 1;
+  const maxTurns = PROMPTS_CONFIG.maxAssistantTurns || 8;
+  const isWrapUpTurn = assistantTurns >= maxTurns - 1;
 
-  let systemPrompt = CLOSUREAI_SYSTEM_PROMPT;
+  let systemPrompt = PROMPTS_CONFIG.systemPrompt;
 
   if (isWrapUpTurn) {
     systemPrompt += `
@@ -1260,7 +1052,7 @@ Sound warm and encouraging, and make it clear this is a good place to pause.
   const messages = [{ role: "system", content: systemPrompt }, ...history];
 
   const completion = await openai.chat.completions.create({
-    model: process.env.CLOSUREAI_MODEL || "gpt-4.1-mini",
+    model: PROMPTS_CONFIG.model || "gpt-4.1-mini",
     messages,
     temperature: 0.7,
     max_tokens: 800,
@@ -1359,11 +1151,13 @@ app.get("/test/email", async (req, res) => {
   if (!to) {
     return res
       .status(400)
-      .send("Provide ?to=someone@example.com or set TEST_EMAIL_TO in .env");
+      .send(
+        "Provide ?to=someone@example.com or set TEST_EMAIL_TO in .env"
+      );
   }
 
   try {
-    const loginUrl = `${APP_BASE_URL}/login/test-magic-link`;
+    const loginUrl = `${APP_CONFIG.baseUrl}/login/test-magic-link`;
 
     await sendMagicLinkEmail({
       to,
@@ -1398,8 +1192,8 @@ app.post("/api/create-checkout-session", async (req, res) => {
         },
       ],
       allow_promotion_codes: true,
-      success_url: `${APP_BASE_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${APP_BASE_URL}/cancelled`,
+      success_url: `${APP_CONFIG.baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${APP_CONFIG.baseUrl}/cancelled`,
     });
 
     return res.json({ url: session.url });
@@ -1423,5 +1217,5 @@ app.use((req, res) => {
 
 // ---- Server start ----
 app.listen(PORT, () => {
-  console.log(`ClosureAI API running on port ${PORT}`);
+  console.log(`${APP_CONFIG.appName} API running on port ${PORT}`);
 });
