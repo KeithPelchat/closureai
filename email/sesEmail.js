@@ -1,89 +1,197 @@
 // email/sesEmail.js
-require("dotenv").config();
-const { SESClient, SendEmailCommand } = require("@aws-sdk/client-ses");
 
-// Initialize SES client
-const ses = new SESClient({
-  region: process.env.AWS_REGION || "us-east-2",
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
+const { SESClient, SendEmailCommand } = require("@aws-sdk/client-ses");
+const EMAIL_CONFIG = require("../config/emailConfig");
+const APP_CONFIG = require("../config/appConfig");
+
+const sesRegion = process.env.AWS_REGION || "us-east-1";
+
+const sesClient = new SESClient({
+  region: sesRegion,
 });
 
 /**
- * Send a transactional email via AWS SES
+ * Build the "From" header - "Name <email@example.com>"
+ */
+function buildFrom() {
+  const name = EMAIL_CONFIG.fromName || APP_CONFIG.appName || "ClosureAI";
+  const email = EMAIL_CONFIG.fromEmail;
+  if (!email) {
+    throw new Error(
+      "EMAIL_FROM_EMAIL (or equivalent) is not configured for SES sender"
+    );
+  }
+  return `${name} <${email}>`;
+}
+
+/**
+ * Simple HTML template for the magic link email.
+ */
+function buildMagicLinkHtml({ name, loginUrl }) {
+  const c = EMAIL_CONFIG.magicLink;
+  const safeName = name || "there";
+
+  return `
+  <!doctype html>
+  <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>${c.subject}</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <style>
+        body {
+          margin: 0;
+          padding: 0;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          background: #020617;
+          color: #e2e8f0;
+        }
+        .wrapper {
+          width: 100%;
+          padding: 32px 0;
+        }
+        .card {
+          max-width: 480px;
+          margin: 0 auto;
+          padding: 28px 24px;
+          border-radius: 24px;
+          background: #020617;
+          box-shadow: 0 24px 80px rgba(15, 23, 42, 0.9);
+          border: 1px solid #1f2937;
+        }
+        h1 {
+          font-size: 22px;
+          margin: 0 0 12px;
+        }
+        p {
+          font-size: 14px;
+          line-height: 1.6;
+          margin: 0 0 12px;
+        }
+        .btn {
+          display: inline-block;
+          margin-top: 16px;
+          padding: 10px 18px;
+          border-radius: 999px;
+          background: #22c55e;
+          color: #020617 !important;
+          font-weight: 600;
+          font-size: 14px;
+          text-decoration: none;
+        }
+        .url {
+          font-size: 12px;
+          word-break: break-all;
+          color: #94a3b8;
+          margin-top: 16px;
+        }
+        .footer {
+          font-size: 12px;
+          color: #6b7280;
+          margin-top: 20px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="wrapper">
+        <div class="card">
+          <p style="font-size:12px;color:#9ca3af;margin:0 0 6px;">
+            ${c.previewText}
+          </p>
+          <h1>${c.heading}</h1>
+          <p>Hi ${safeName},</p>
+          <p>${c.intro}</p>
+          <p>
+            <a href="${loginUrl}" class="btn" target="_blank" rel="noopener noreferrer">
+              ${c.buttonLabel}
+            </a>
+          </p>
+          <p class="url">
+            If the button doesn’t work, you can copy and paste this link into your browser:<br />
+            ${loginUrl}
+          </p>
+          <p class="footer">
+            ${c.footerText}
+          </p>
+        </div>
+      </div>
+    </body>
+  </html>
+  `;
+}
+
+/**
+ * Plain-text fallback body.
+ */
+function buildMagicLinkText({ name, loginUrl }) {
+  const c = EMAIL_CONFIG.magicLink;
+  const safeName = name || "there";
+
+  return [
+    `Hi ${safeName},`,
+    "",
+    c.intro,
+    "",
+    `Your secure link: ${loginUrl}`,
+    "",
+    c.footerText,
+  ].join("\n");
+}
+
+/**
+ * Send the magic link email using SES.
+ *
+ * Uses the classic SES v1 SendEmail API shape:
+ * Source, Destination, Message { Subject, Body: { Html, Text } }
  */
 async function sendMagicLinkEmail({ to, name, loginUrl }) {
-  const fromEmail =
-    process.env.CLOSUREAI_FROM_EMAIL || "ClosureAI <hello@getclosureai.com>";
+  if (!to) {
+    throw new Error("sendMagicLinkEmail: 'to' is required");
+  }
+  if (!loginUrl) {
+    throw new Error("sendMagicLinkEmail: 'loginUrl' is required");
+  }
 
-  const safeName = name?.trim() || "there";
+  const from = buildFrom();
+  const c = EMAIL_CONFIG.magicLink;
 
-  const subject = "Your private ClosureAI session link";
-
-  const textBody = `
-Hi ${safeName},
-
-Here’s your private link to begin your ClosureAI Holiday Closure session:
-
-${loginUrl}
-
-This link works for 24 hours and will take you directly into your secure dashboard.
-
-Your session is for reflection only — nothing you write is ever emailed or shared.
-
-If you ever feel unsafe or in crisis, please contact a qualified professional
-or local emergency services.
-
-– ClosureAI
-  `.trim();
-
-  const htmlBody = `
-  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #0f172a; line-height: 1.6; max-width: 480px; margin: 0 auto;">
-    <p>Hi ${safeName},</p>
-
-    <p>Your private <strong>ClosureAI Holiday Closure</strong> session is ready.</p>
-
-    <p style="margin: 24px 0;">
-      <a href="${loginUrl}"
-        style="background:#22c55e; padding:14px 22px; border-radius:999px; 
-               color:#020617; text-decoration:none; font-weight:600; display:inline-block;">
-        Start Your Closure Session
-      </a>
-    </p>
-
-    <p>This link works for 24 hours and takes you directly into your secure dashboard.</p>
-
-    <p style="font-size:13px; color:#475569; margin-top:24px;">
-      Your session is for reflection only — nothing you write here is ever emailed to anyone.
-      If you ever feel unsafe or in crisis, please contact a qualified professional or
-      local emergency services.
-    </p>
-
-    <p style="font-size:13px; color:#94a3b8; margin-top:16px;">– ClosureAI</p>
-  </div>
-  `;
+  const htmlBody = buildMagicLinkHtml({ name, loginUrl });
+  const textBody = EMAIL_CONFIG.magicLink.includeTextBody
+    ? buildMagicLinkText({ name, loginUrl })
+    : undefined;
 
   const params = {
-    Source: fromEmail,
-    Destination: { ToAddresses: [to] },
+    Source: from,
+    Destination: {
+      ToAddresses: [to],
+    },
+    ReplyToAddresses: EMAIL_CONFIG.replyToEmail
+      ? [EMAIL_CONFIG.replyToEmail]
+      : [],
     Message: {
-      Subject: { Data: subject },
+      Subject: {
+        Data: c.subject,
+        Charset: "UTF-8",
+      },
       Body: {
-        Text: { Data: textBody },
-        Html: { Data: htmlBody },
+        Html: {
+          Data: htmlBody,
+          Charset: "UTF-8",
+        },
+        ...(textBody
+          ? {
+              Text: {
+                Data: textBody,
+                Charset: "UTF-8",
+              },
+            }
+          : {}),
       },
     },
   };
 
-  try {
-    await ses.send(new SendEmailCommand(params));
-    console.log("Magic link email sent to:", to);
-  } catch (err) {
-    console.error("SES email error:", err);
-    throw err;
-  }
+  const command = new SendEmailCommand(params);
+  await sesClient.send(command);
 }
 
 module.exports = {
