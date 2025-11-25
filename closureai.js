@@ -12,10 +12,19 @@ const https = require("https");
 
 const APP_CONFIG = require("./config/appConfig");
 const PROMPTS_CONFIG = require("./config/promptsConfig");
+const STRIPE_CONFIG = require("./config/stripeConfig");
+
 
 const db = require("./db");
 const { sendMagicLinkEmail } = require("./email/sesEmail");
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const stripe = require("stripe")(STRIPE_CONFIG.secretKey || "");
+if (!STRIPE_CONFIG.secretKey) {
+  console.warn(
+    "[Stripe] STRIPE_SECRET_KEY is not set. Stripe-related routes will fail until configured."
+  );
+}
+
+
 
 // OpenAI client (v4+ style)
 const OpenAI = require("openai");
@@ -57,7 +66,6 @@ app.get("/", (req, res) => {
 // ---------------------------------------------------------------------
 const PORT = process.env.PORT || 3200;
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 // Google OAuth
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
@@ -93,8 +101,9 @@ app.post(
       event = stripe.webhooks.constructEvent(
         req.body,
         sig,
-        STRIPE_WEBHOOK_SECRET
+        STRIPE_CONFIG.webhookSecret
       );
+
     } catch (err) {
       console.error("❌ Stripe webhook signature error:", err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -1181,20 +1190,21 @@ app.post("/api/create-checkout-session", async (req, res) => {
       return res.status(400).json({ error: "Email is required" });
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      payment_method_types: ["card"],
-      customer_email: normalizeEmail(email),
-      line_items: [
-        {
-          price: process.env.STRIPE_PRICE_ID,
-          quantity: 1,
-        },
-      ],
-      allow_promotion_codes: true,
-      success_url: `${APP_CONFIG.baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${APP_CONFIG.baseUrl}/cancelled`,
-    });
+        const session = await stripe.checkout.sessions.create({
+          mode: STRIPE_CONFIG.mode,
+          payment_method_types: ["card"],
+          customer_email: normalizeEmail(email),
+          line_items: [
+            {
+              price: STRIPE_CONFIG.priceId,
+              quantity: 1,
+            },
+          ],
+          allow_promotion_codes: STRIPE_CONFIG.allowPromotionCodes,
+          success_url: STRIPE_CONFIG.getSuccessUrl(),
+          cancel_url: STRIPE_CONFIG.getCancelUrl(),
+        });
+
 
     return res.json({ url: session.url });
   } catch (err) {
