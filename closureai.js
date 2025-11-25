@@ -479,7 +479,7 @@ async function handlePaidUser(session) {
 
   await sendMagicLinkEmail({
     to: user.email,
-    name: user.name,
+    name: user.name || user.email,
     loginUrl,
   });
 
