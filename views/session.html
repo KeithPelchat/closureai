@@ -5,6 +5,7 @@
     <title>ClosureAI – Clarity Session</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/css/offers.css" />
 
     <style>
       /* ---- Let the page scroll naturally ---- */
@@ -459,6 +460,7 @@
       </main>
     </div>
 
+    <script src="/js/offers.js"></script>
     <script>
       // ---------- Shared fetch helper ----------
       async function fetchJSON(url, options) {
@@ -670,6 +672,11 @@
 
           messages.push({ role: "assistant", content: reply });
           renderMessages();
+
+          // Show offer cards if we're at wrap-up
+          if (data.isWrapUp && data.offers && data.offers.length > 0) {
+            renderOfferCards(data.offers, chatLogEl);
+          }
         } catch (err) {
           console.error("Error getting clarity:", err);
           errorEl.textContent =

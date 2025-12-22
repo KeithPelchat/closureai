@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive AI Micro-App Demo – HyperGen AI & ClosureAI</title>
+  <meta name="description" content="See a live AI micro-app in action, then have HyperGen AI build a custom version for your business.">
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700&family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+  <!-- OG / Social -->
+  <meta property="og:title" content="Interactive AI Micro-App Demo – HyperGen AI" />
+  <meta property="og:description" content="Test-drive a live AI micro-app and explore done-for-you builds for your business." />
+  <meta property="og:image" content="https://getclosureai.com/assets/og-closureai-holiday.png" />
+  <meta property="og:url" content="https://getclosureai.com/demo" />
+  <meta property="og:type" content="website" />
+
+  <style>
+    :root {
+      --bg-page: #ffffff;
+      --bg-hero-top: #ffffff;
+      --bg-hero-bottom: #f7f9fc;
+      --bg-section-alt: #f7f9fc;
+
+      --text-main: #111827;
+      --text-muted: #4b5563;
+
+      --border-subtle: #e5e7eb;
+      --card-bg: #ffffff;
+
+      --accent-yellow: #F9C316;
+      --accent-cream: #FFFBE2;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Ubuntu', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-page);
+      color: var(--text-main);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1, h2, h3 {
+      margin-top: 0;
+      font-family: 'Orbitron', 'Ubuntu', system-ui, sans-serif;
+      font-weight: 600;
+      color: #111827;
+      letter-spacing: 0.02em;
+    }
+
+    h1 {
+      font-size: 40px;
+      line-height: 1.15;
+    }
+
+    h2 {
+      font-size: 28px;
+      line-height: 1.25;
+    }
+
+    h3 {
+      font-size: 22px;
+      line-height: 1.3;
+    }
+
+    p, li {
+      font-size: 18px;
+    }
+
+    /* Base section (boxed) */
+    .section {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 64px 24px;
+    }
+
+    /* Full-width gray bands */
+    .section-alt {
+      width: 100%;
+      max-width: none;
+      padding: 0;
+      background: var(--bg-section-alt);
+      border-top: 1px solid rgba(229, 231, 235, 0.9);
+      border-bottom: 1px solid rgba(229, 231, 235, 0.9);
+    }
+
+    /* Inner content container for both normal and alt sections */
+    .section-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 64px 24px;
+    }
+
+    .section-center {
+      text-align: center;
+    }
+
+    /* CTA container */
+    .section-cta-block {
+      margin: 24px 0 16px;
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    /* Primary CTA */
+    .section-cta {
+      background: linear-gradient(135deg, #F9C316, #facc15);
+      color: #111827;
+      padding: 14px 28px;
+      font-size: 16px;
+      font-weight: 700;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .section-cta:hover {
+      opacity: 0.95;
+      transform: translateY(-2px);
+      box-shadow: 0 16px 36px rgba(15, 23, 42, 0.22);
+    }
+
+    .section-cta:active {
+      transform: translateY(0);
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+    }
+
+    /* Secondary CTA */
+    .section-cta-secondary {
+      background: transparent;
+      color: var(--text-muted);
+      padding: 12px 22px;
+      font-size: 15px;
+      font-weight: 500;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      cursor: pointer;
+      transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease, color 0.15s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .section-cta-secondary:hover {
+      background: #f3f4f6;
+      color: #111827;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .code-pill {
+      font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--accent-cream);
+      color: #111827;
+      border: 1px solid #e5e7eb;
+    }
+
+    /* Header / Hero */
+
+    .hero-wrap {
+      background: radial-gradient(circle at top left, #ffffff 0, #f7f9fc 60%, #f2f6fb 100%);
+      border-bottom: 1px solid rgba(229, 231, 235, 0.9);
+    }
+
+    .site-header {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 8px 24px 0;    /* was 18px top */
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+
+    .logo img {
+      height: 40px;
+      width: auto;
+      display: block;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 16px 24px 56px;
+    }
+
+    .hero h1 {
+      font-size: 38px;
+      margin-top: 8px;
+    }
+
+    .hero p {
+      max-width: 700px;
+      margin: 20px auto 0;
+      font-size: 19px;
+      color: var(--text-muted);
+    }
+
+    .hero-subtext {
+      margin-top: 12px;
+      font-size: 15px;
+      color: var(--text-muted);
+    }
+
+    .cta-row {
+      margin-top: 28px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .hero-note {
+      margin-top: 12px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .hero-note code {
+      font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: var(--accent-cream);
+      color: #111827;
+      border: 1px solid #e5e7eb;
+    }
+
+    /* Cards / grids */
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 18px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+      padding: 22px 22px 20px;
+    }
+
+    .example-grid {
+      display: grid;
+      gap: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      margin-top: 28px;
+    }
+
+    .example-card {
+      background: #ffffff;
+      border-radius: 18px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+      padding: 20px 20px 18px;
+    }
+
+    .example-card h3 {
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+
+    .example-card p {
+      margin: 0;
+      font-size: 16px;
+      color: var(--text-muted);
+    }
+
+    .steps {
+      display: grid;
+      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      margin-top: 24px;
+    }
+
+    .step-box {
+      background: #ffffff;
+      border-radius: 16px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+      padding: 20px 20px 18px;
+    }
+
+    .step-label {
+      display: inline-block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #6b7280;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .step-label span {
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    /* Price / List */
+
+    .price-tag {
+      display: inline-block;
+      margin-bottom: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .price-tag small {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .price-subtext {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .feature-list {
+      list-style: none;
+      padding-left: 0;
+      margin: 16px 0 0;
+    }
+
+    .feature-list li {
+      position: relative;
+      padding-left: 22px;
+      margin-bottom: 8px;
+      font-size: 16px;
+      color: var(--text-muted);
+    }
+
+    .feature-list li::before {
+      content: "•";
+      position: absolute;
+      left: 6px;
+      top: 0;
+      color: var(--accent-yellow);
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .tiny-note {
+      font-size: 13px;
+      color: #6b7280;
+      margin-top: 18px;
+    }
+
+    .tiny-note em {
+      font-style: italic;
+    }
+
+    /* Demo visual */
+
+    .demo-visual {
+      margin-top: 26px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .demo-visual-inner {
+      max-width: 320px;
+      width: 100%;
+      border-radius: 28px;
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 14px 36px rgba(15, 23, 42, 0.12);
+      background: #ffffff;
+    }
+
+    .demo-visual-inner img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    /* Footer */
+
+    footer {
+      margin-top: 24px;
+      padding: 32px 24px 28px;
+      text-align: center;
+      font-size: 14px;
+      color: #6b7280;
+      border-top: 1px solid rgba(229, 231, 235, 0.9);
+      background: #f9fafb;
+    }
+
+    footer a {
+      color: #111827;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* Responsive */
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 30px;
+      }
+
+      .hero h1 {
+        font-size: 30px;
+      }
+
+      h2 {
+        font-size: 24px;
+      }
+
+      p, li {
+        font-size: 16px;
+      }
+
+      .section {
+        padding: 48px 18px;
+      }
+
+      .section-inner {
+        padding: 48px 18px;
+      }
+
+      .hero {
+        padding: 28px 18px 56px;
+      }
+
+      .logo img {
+        height: 34px;
+      }
+
+      .section-cta,
+      .section-cta-secondary {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    @media (min-width: 1100px) {
+      .section {
+        padding-top: 72px;
+        padding-bottom: 72px;
+      }
+
+      .section-inner {
+        padding-top: 72px;
+        padding-bottom: 72px;
+      }
+
+      .hero {
+        padding-bottom: 64px;
+      }
+
+      h1 {
+        font-size: 44px;
+      }
+
+      .hero h1 {
+        font-size: 44px;
+      }
+      /* --- Tighten hero spacing --- */
+
+        .hero.section {
+        /* Reduce the base section padding for the hero */
+        padding: 16px 24px 40px;
+        }
+
+        .hero.section .section-inner {
+        /* Kill the extra 64px top/bottom padding inside hero */
+        padding-top: 12px;
+        padding-bottom: 0;
+        }
+
+        .site-header {
+        /* Slightly tighter header spacing above the logo */
+        padding: 6px 24px 0;
+        }
+
+        .hero h1 {
+        /* Ensure there isn't any weird default margin pushing it down */
+        margin-top: 10px;
+        }
+
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HERO + HEADER WRAP -->
+  <div class="hero-wrap">
+    <header class="site-header">
+      <a href="/" class="logo">
+        <img src="/assets/hypergenai-logo.png" alt="HyperGen AI logo">
+      </a>
+    </header>
+
+    <section class="hero section" aria-labelledby="hero-title">
+      <div class="section-inner" id="demo-cta">
+        <h1 id="hero-title">See a Live AI Micro-App Built on the HyperGen Engine</h1>
+        <p>
+          This demo runs on ClosureAI — one of our internal micro-apps. HyperGen AI uses the same engine
+          to build custom micro-apps for coaches, consultants, and local service businesses.
+        </p>
+        <p class="hero-subtext">
+          Test-drive the experience for yourself, then imagine a version branded and scripted just for your business.
+        </p>
+
+        <div class="cta-row">
+          <a
+            href="https://hypergen.ai/consult"
+            class="section-cta"
+          >
+            Book a Micro-App Brainstorm
+          </a>
+          <a href="/holiday-pass" class="section-cta-secondary">
+            Test Drive the Demo
+            <span class="code-pill">NAP2025</span>
+          </a>
+        </div>
+
+        <p class="hero-note">
+          Use code <code>NAP2025</code> on the Holiday Sanity Pass page to unlock
+          <strong>100% off</strong> the demo. Try ClosureAI, then picture a version tuned to your customers.
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <main>
+    <!-- WHAT IS A MICRO-APP -->
+    <section class="section section-alt">
+      <div class="section-inner">
+        <h2>What’s a micro-app, and why should you care?</h2>
+        <p>
+          Most businesses either send people to a generic chatbot or hand them another PDF they’ll never read.
+          A micro-app does something different: it walks your prospect or client through a short, guided experience
+          that ends with a clear result.
+        </p>
+        <p>
+          Instead of dumping information on them, it helps them answer one important question, make one decision,
+          or see one snapshot of their situation — in just a few minutes, without you needing to be there.
+        </p>
+        <p>
+          That tiny win builds trust. It shows how you think. And it moves them closer to booking a call,
+          scheduling a visit, or saying “yes” to the next step.
+        </p>
+        <ul class="feature-list">
+          <li>Runs 24/7 without you babysitting it.</li>
+          <li>Delivers a small but meaningful win your people actually feel.</li>
+          <li>Positions you as the helpful expert instead of another loud ad.</li>
+          <li>Replaces boring lead magnets and static downloads with something interactive.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- DEMO SECTION -->
+    <section class="section">
+      <div class="section-inner">
+        <h2>Try the live demo: ClosureAI</h2>
+        <p>
+          ClosureAI is the emotional-clarity micro-app this whole system was built on. It’s designed for
+          individuals who need a calm, guided place to process hard moments — especially when their brain
+          won’t shut off at 2am.
+        </p>
+        <p>
+          For you as a business owner, the most important part is <em>the experience</em>:
+          how smooth it feels to log in, answer a few questions, and walk away with clarity.
+          That same engine can power a micro-app built around the problems your customers actually care about.
+        </p>
+
+        <div class="section-cta-block">
+          <a href="/holiday-pass" class="section-cta">
+            Open the ClosureAI Demo
+          </a>
+          <a href="/holiday-pass" class="section-cta-secondary">
+            Use code <span class="code-pill">NAP2025</span> for 100% off
+          </a>
+        </div>
+
+        <p class="hero-note" style="text-align:center;margin-top:12px;">
+          Once you’ve tried it, imagine swapping the questions and language for your own industry —
+          that’s your micro-app.
+        </p>
+
+        <div class="demo-visual">
+          <div class="demo-visual-inner">
+            <video
+                class="demo-video"
+                src="/assets/homepagedemo.mp4"
+                controls
+                playsinline
+                preload="metadata"
+                poster="/images/closureai-screenshot.png"
+                style="max-width: 100%; border-radius: 12px; margin-top: 16px;"
+            >
+                Your browser does not support the video tag.
+            </video>
+            <script>
+                const v = document.getElementById("demoVideo");
+                v.playbackRate = 1.5;
+            </script>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- INDUSTRY EXAMPLES -->
+    <section class="section section-alt">
+      <div class="section-inner">
+        <h2>What could a micro-app do for your business?</h2>
+        <p>
+          Here are a few ways different businesses could use an AI micro-app. The engine is the same —
+          we just change the problem, the questions, and the language.  This is not a comprehensive list, it's just to get your wheels turning.
+        </p>
+        <p>
+          Think about the top 2 or 3 question you get repeatedly from prospects or clients.  Let's build a micro-app to answer those questions for you (or more importantly, for them). 
+        </p>
+
+        <div class="example-grid">
+          <div class="example-card">
+            <h3>HVAC – “Emergency Heat Triage”</h3>
+            <p>
+              Homeowners answer a few questions and get clear next steps:
+              try a simple fix, shut things down, or call you now. You look like the hero either way.
+            </p>
+          </div>
+
+          <div class="example-card">
+            <h3>Real Estate – “Buy Now or Wait?”</h3>
+            <p>
+              Buyers walk through their situation and get a simple, human explanation of what makes sense next,
+              plus an easy way to book a call with you.
+            </p>
+          </div>
+
+          <div class="example-card">
+            <h3>Financial Advisors – “Retirement Readiness Snapshot”</h3>
+            <p>
+              Visitors answer a short series of questions and receive a readiness summary and suggested talking points
+              for your first meeting.
+            </p>
+          </div>
+
+          <div class="example-card">
+            <h3>Insurance – “Coverage Gap Checkup”</h3>
+            <p>
+              Prospects get a quick sense of where they might be underprotected, along with a gentle nudge
+              to review those areas with you.
+            </p>
+          </div>
+
+          <div class="example-card">
+            <h3>Home Services – “DIY or Call a Pro?”</h3>
+            <p>
+              A short decision helper that tells people when it’s safe to handle something themselves
+              and when they should book you instead.
+            </p>
+          </div>
+
+          <div class="example-card">
+            <h3>Coaches &amp; Mentors – “Clarity Session Tool”</h3>
+            <p>
+              A branded, between-sessions space like ClosureAI that uses your language and frameworks
+              so clients stay grounded in your process.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- OFFER: DFY SERVICE -->
+    <section class="section">
+      <div class="section-inner">
+        <div class="card">
+          <h2>Done-for-you AI micro-apps, built by HyperGen AI.</h2>
+          <p>
+            HyperGen AI builds custom micro-apps on the same engine that powers ClosureAI.
+            You bring the audience and the problem; we handle the prompts, flows, and tech.
+          </p>
+
+          <p class="price-tag">
+            Typical build: $995 <small>one-time per micro-app</small>
+          </p>
+          <p class="price-subtext">
+            Hosting &amp; maintenance available separately so you never have to worry about servers, updates, or breakage.
+            If we met through a Tennessee networking group like NAP, ask about local Founder pricing.
+          </p>
+
+          <ul class="feature-list">
+            <li>Custom-branded experience with your logo, colors, and tone of voice.</li>
+            <li>Designed around one clear, valuable problem for your ideal customer.</li>
+            <li>Hosted for you with a simple link you can share anywhere.</li>
+            <li>Easy to embed in your website, funnels, or CRM automations.</li>
+            <li>Light usage logging so you can see how often people run it.</li>
+            <li>Delivery in just a few days once we’ve mapped out the flow together.</li>
+          </ul>
+
+          <p class="tiny-note">
+            <strong>Note:</strong> ClosureAI and any custom apps built on this engine are for reflection and decision support only.
+            They are not a substitute for therapy, medical care, legal advice, or crisis services.
+            If a user is in crisis, they should contact local emergency services or a crisis hotline in their area.
+          </p>
+        </div>
+
+        <div class="section-cta-block">
+          <a
+            href="https://hypergen.ai/consult"
+            class="section-cta"
+          >
+            Ask About The NAP Special Offer!
+          </a>
+          <a href="/holiday-pass" class="section-cta-secondary">
+            Try the ClosureAI Demo
+            <span class="code-pill">NAP2025</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- SIMPLE 3-STEP PROCESS -->
+    <section class="section section-alt">
+      <div class="section-inner">
+        <h2>Simple 3-step build process</h2>
+        <p>
+          No heavy tech lift on your side. We keep things straightforward so you can
+          stay focused on running your business.
+        </p>
+
+        <div class="steps">
+          <div class="step-box">
+            <p class="step-label">Step 1: <span>Quick mapping call</span></p>
+            <p>
+              We identify your audience, the specific problem we want the micro-app to solve,
+              and where it fits in your existing marketing or client journey.
+            </p>
+          </div>
+
+          <div class="step-box">
+            <p class="step-label">Step 2: <span>Design &amp; build</span></p>
+            <p>
+              We write the prompts, design the flow, and stand up the UI on secure hosting.
+              You’ll be able to click through and test it before you share it with anyone.
+            </p>
+          </div>
+
+          <div class="step-box">
+            <p class="step-label">Step 3: <span>Launch &amp; measure</span></p>
+            <p>
+              You get a simple link, basic usage logging, and quickstart guidance so you know exactly
+              how to roll it out to your list, clients, or local market.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FINAL CTA -->
+    <section class="section">
+      <div class="section-inner section-center">
+        <h2>Want ideas for your industry?</h2>
+        <p>
+          If we met at a NAP event or another local meetup, mention that in your email and
+          I’ll map out two or three micro-app ideas tailored to your business — no pressure, just brainstorming.
+        </p>
+
+        <div class="section-cta-block">
+          <a
+            href="https://hypergen.ai/consult"
+            class="section-cta"
+          >
+            Meet With Keith to Brainstorm
+          </a>
+          <a href="/holiday-pass" class="section-cta-secondary">
+            Or try the ClosureAI demo with
+            <span class="code-pill">NAP2025</span>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <p style="margin:0 0 4px;">
+      © 2025 HyperGen AI &amp; ClosureAI. Products of More Leads Online LLC.
+    </p>
+    <p style="margin:0 0 4px;font-size:13px;color:#9ca3af;">
+      ClosureAI and any custom apps built on this engine are not a substitute for therapy or medical care and do not provide
+      medical, legal, or crisis advice. If you are in crisis, please contact local emergency services or a crisis hotline
+      in your area.
+    </p>
+    <p style="margin:8px 0 0;font-size:13px;">
+      <a href="/terms">Terms &amp; Conditions</a>
+      &nbsp;·&nbsp;
+      <a href="/privacy">Privacy Policy</a>
+      &nbsp;·&nbsp;
+      <a href="/disclaimer">Disclaimer</a>
+    </p>
+  </footer>
+
+</body>
+</html>

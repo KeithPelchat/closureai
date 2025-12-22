@@ -15,18 +15,15 @@ const PROMPTS_CONFIG = require("./config/promptsConfig");
 const STRIPE_CONFIG = require("./config/stripeConfig");
 const UI_CONFIG = require("./config/uiConfig");
 
-
-
 const db = require("./db");
 const { sendMagicLinkEmail } = require("./email/sesEmail");
+
 const stripe = require("stripe")(STRIPE_CONFIG.secretKey || "");
 if (!STRIPE_CONFIG.secretKey) {
   console.warn(
     "[Stripe] STRIPE_SECRET_KEY is not set. Stripe-related routes will fail until configured."
   );
 }
-
-
 
 // OpenAI client (v4+ style)
 const OpenAI = require("openai");
@@ -35,6 +32,33 @@ const openai = new OpenAI({
 });
 
 const app = express();
+
+// ---------------------------------------------------------------------
+// Multi-tenant app context
+// ---------------------------------------------------------------------
+const APP_SLUG = process.env.APP_SLUG || "closureai";
+let APP_ID = null;
+
+async function initAppId() {
+  const result = await db.query(
+    "SELECT id, slug, base_url FROM apps WHERE slug = $1",
+    [APP_SLUG]
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error(`No apps row found for slug=${APP_SLUG}`);
+  }
+
+  APP_ID = result.rows[0].id;
+  console.log(
+    `[CLOSUREAI] Loaded app ${APP_SLUG} with id ${APP_ID} (base_url=${result.rows[0].base_url})`
+  );
+}
+
+initAppId().catch((err) => {
+  console.error("[CLOSUREAI] Failed to initialize APP_ID:", err);
+  process.exit(1);
+});
 
 // ---------------------------------------------------------------------
 // Static assets (logo, favicons, OG images, etc.)
@@ -48,7 +72,6 @@ app.get("/", (req, res) => {
   const filePath = path.join(__dirname, "public", "default.html");
   renderHtmlTemplate(res, filePath);
 });
-
 
 // ---------------------------------------------------------------------
 // Config
@@ -92,7 +115,6 @@ app.post(
         sig,
         STRIPE_CONFIG.webhookSecret
       );
-
     } catch (err) {
       console.error("❌ Stripe webhook signature error:", err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -175,34 +197,39 @@ async function findOrCreateUser({ email, name, ghlContactId }) {
   if (!normalizedEmail) {
     throw new Error("Email is required to findOrCreateUser");
   }
+  if (!APP_ID) {
+    throw new Error("APP_ID not initialized");
+  }
 
   const existing = await db.query(
-    "SELECT * FROM closureai_users WHERE email = $1",
-    [normalizedEmail]
+    "SELECT * FROM users WHERE app_id = $1 AND email = $2",
+    [APP_ID, normalizedEmail]
   );
 
   if (existing.rows.length > 0) {
     const user = existing.rows[0];
 
-    // Keep user info fresh if GHL or Stripe sends updates
     if (name !== user.name || ghlContactId !== user.ghl_contact_id) {
-      await db.query(
-        "UPDATE closureai_users SET name = $1, ghl_contact_id = $2, updated_at = now() WHERE id = $3",
+      const updated = await db.query(
+        `UPDATE users
+         SET name = $1,
+             ghl_contact_id = $2,
+             updated_at = now()
+         WHERE id = $3
+         RETURNING *`,
         [name, ghlContactId, user.id]
       );
-      user.name = name;
-      user.ghl_contact_id = ghlContactId;
+      return updated.rows[0];
     }
 
     return user;
   }
 
-  const id = uuidv4();
   const result = await db.query(
-    `INSERT INTO closureai_users (id, email, name, ghl_contact_id)
+    `INSERT INTO users (email, name, ghl_contact_id, app_id)
      VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [id, normalizedEmail, name, ghlContactId]
+    [normalizedEmail, name, ghlContactId, APP_ID]
   );
 
   return result.rows[0];
@@ -213,12 +240,62 @@ async function createMagicLink(userId) {
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
 
   await db.query(
-    `INSERT INTO closureai_magic_links (id, user_id, token, expires_at)
-     VALUES ($1, $2, $3, $4)`,
-    [uuidv4(), userId, token, expires]
+    `INSERT INTO magic_links (user_id, token, expires_at)
+     VALUES ($1, $2, $3)`,
+    [userId, token, expires]
   );
 
-  return `${APP_CONFIG.baseUrl}/login/${token}`;
+  // Use app base URL from config
+  const baseUrl = APP_CONFIG.baseUrl || process.env.APP_BASE_URL;
+  const loginPath = "/login/" + token;
+  const loginUrl = `${baseUrl}${loginPath}`;
+
+  return loginUrl;
+}
+
+async function getOffersForApp(appId, options = {}) {
+  const { activeOnly = true } = options;
+
+  let query = `
+    SELECT
+      id,
+      title,
+      description,
+      url,
+      offer_type,
+      trigger_keywords,
+      ai_mention_text,
+      display_order,
+      is_active,
+      show_inline,
+      show_at_wrapup,
+      show_as_card,
+      cta_text
+    FROM offers
+    WHERE app_id = $1
+  `;
+
+  if (activeOnly) {
+    query += ` AND is_active = true`;
+  }
+
+  query += ` ORDER BY display_order ASC, created_at ASC`;
+
+  const result = await db.query(query, [appId]);
+  return result.rows;
+}
+
+async function getCoachNameForApp(appId) {
+  const result = await db.query(
+    `SELECT coach_name, slug FROM apps WHERE id = $1`,
+    [appId]
+  );
+
+  if (result.rows.length > 0 && result.rows[0].coach_name) {
+    return result.rows[0].coach_name;
+  }
+
+  return "your coach";
 }
 
 // ---------------------------------------------------------------------
@@ -281,7 +358,6 @@ function renderHtmlTemplate(res, filePath, extraTokens = {}) {
   });
 }
 
-
 // ---------------------------------------------------------------------
 // Auth middleware (JWT + Holiday Pass enforcement)
 // ---------------------------------------------------------------------
@@ -296,10 +372,9 @@ async function requireAuth(req, res, next) {
   try {
     const payload = jwt.verify(token, JWT_SECRET);
 
-    const result = await db.query(
-      "SELECT * FROM closureai_users WHERE id = $1",
-      [payload.userId]
-    );
+    const result = await db.query("SELECT * FROM users WHERE id = $1", [
+      payload.userId,
+    ]);
 
     if (result.rows.length === 0) {
       return respondUnauthorized(req, res);
@@ -338,7 +413,6 @@ function respondUnauthorized(req, res) {
     });
   }
 
-  // For normal browser navigation, send them to the login page
   return res.redirect(302, "/login");
 }
 
@@ -361,10 +435,7 @@ function respondHolidayPassExpired(req, res) {
     ? new Date(expiresAt).toLocaleString()
     : "already";
 
-  return res
-    .status(403)
-    .send(
-      `
+  return res.status(403).send(`
       <!doctype html>
       <html>
         <head>
@@ -409,28 +480,17 @@ function respondHolidayPassExpired(req, res) {
             <h1>${APP_CONFIG.holidayPassName} expired</h1>
             <p>Your ${APP_CONFIG.appName} ${APP_CONFIG.holidayPassName} expired ${expiresText}.</p>
             <p>To keep using ${APP_CONFIG.appName}, you’ll need to renew your pass.</p>
-            <!-- TODO: Replace with your renewal funnel when ready -->
             <a href="${APP_CONFIG.renewalPath}">Renew ${APP_CONFIG.holidayPassName}</a>
           </div>
         </body>
       </html>
-      `
-    );
+      `);
 }
 
 // ---------------------------------------------------------------------
 // Stripe helpers
 // ---------------------------------------------------------------------
 
-/**
- * Shared helper used by both:
- * - Stripe webhook
- * - /checkout/success (auto-login)
- *
- * It guarantees:
- * - user exists
- * - holiday_pass_expires_at is set/extended
- */
 async function ensureUserWithHolidayPassFromSession(session) {
   const email =
     session.customer_details?.email || session.customer_email || null;
@@ -451,7 +511,7 @@ async function ensureUserWithHolidayPassFromSession(session) {
   const expiresAt = getHolidayPassExpiryDate();
 
   await db.query(
-    `UPDATE closureai_users
+    `UPDATE users
      SET holiday_pass_expires_at = $1,
          updated_at = now()
      WHERE id = $2`,
@@ -462,14 +522,11 @@ async function ensureUserWithHolidayPassFromSession(session) {
     `🎟️ ${APP_CONFIG.holidayPassName} granted to ${user.email} until ${expiresAt.toISOString()}`
   );
 
-  // Update user object in memory to reflect expiry
   user.holiday_pass_expires_at = expiresAt.toISOString();
 
   return { user, expiresAt };
 }
 
-// Handle a successful paid Stripe checkout in the webhook:
-// grant Holiday Pass + send Secure Link email
 async function handlePaidUser(session) {
   const { user, expiresAt } = await ensureUserWithHolidayPassFromSession(
     session
@@ -494,7 +551,7 @@ async function handlePaidUser(session) {
 
 // Health check
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", app: APP_CONFIG.appName });
+  res.json({ status: "ok", app: APP_CONFIG.appName, slug: APP_SLUG });
 });
 
 // Static informational pages
@@ -518,12 +575,15 @@ app.get("/coach", (req, res) => {
   res.sendFile(path.join(__dirname, "views", "coach.html"));
 });
 
+app.get("/demo", (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "demo.html"));
+});
+
 // Login page → templated login.html
 app.get("/login", (req, res) => {
   const filePath = path.join(__dirname, "public", "login.html");
   renderHtmlTemplate(res, filePath);
 });
-
 
 // ---------------------------------------------------------------------
 // Auth status & Secure Link auth
@@ -541,7 +601,7 @@ app.get("/auth/status", async (req, res) => {
     const payload = jwt.verify(token, JWT_SECRET);
 
     const result = await db.query(
-      "SELECT id, holiday_pass_expires_at FROM closureai_users WHERE id = $1",
+      "SELECT id, holiday_pass_expires_at FROM users WHERE id = $1",
       [payload.userId]
     );
 
@@ -604,7 +664,6 @@ app.post("/auth/logout", (req, res) => {
 // Google OAuth login
 // ---------------------------------------------------------------------
 
-// Start Google OAuth login
 app.get("/auth/google", (req, res) => {
   if (!GOOGLE_CLIENT_ID || !GOOGLE_REDIRECT_URI) {
     console.error("[Google OAuth] Missing CLIENT_ID or REDIRECT_URI env");
@@ -629,13 +688,17 @@ app.get("/auth/google", (req, res) => {
   return res.redirect(authUrl.toString());
 });
 
-// Google OAuth callback (single, de-duplicated implementation)
+// Google OAuth callback
 app.get("/auth/google/callback", async (req, res) => {
   const { code, error, error_description } = req.query;
 
   try {
     if (error) {
-      console.error("[Google OAuth] Error from Google:", error, error_description);
+      console.error(
+        "[Google OAuth] Error from Google:",
+        error,
+        error_description
+      );
       return res
         .status(400)
         .send("Google login was cancelled or failed. Please try again.");
@@ -653,7 +716,6 @@ app.get("/auth/google/callback", async (req, res) => {
 
     console.log("[Google OAuth] Exchanging code for tokens...");
 
-    // Exchange code for tokens
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: {
@@ -690,7 +752,6 @@ app.get("/auth/google/callback", async (req, res) => {
         .send("Google did not return an ID token. Please try again.");
     }
 
-    // Decode ID token payload (NOT verifying signature here; could be added later)
     const parts = idToken.split(".");
     if (parts.length < 2) {
       console.error("[Google OAuth] Malformed ID token:", idToken);
@@ -702,7 +763,10 @@ app.get("/auth/google/callback", async (req, res) => {
     try {
       payload = JSON.parse(payloadJson);
     } catch (parseErr) {
-      console.error("[Google OAuth] Failed to parse ID token payload:", parseErr);
+      console.error(
+        "[Google OAuth] Failed to parse ID token payload:",
+        parseErr
+      );
       return res.status(500).send("Could not parse Google ID token.");
     }
 
@@ -718,14 +782,12 @@ app.get("/auth/google/callback", async (req, res) => {
 
     console.log("[Google OAuth] Authenticated Google user:", email);
 
-    // Re-use your existing findOrCreateUser helper
     const user = await findOrCreateUser({
       email,
       name,
       ghlContactId: null,
     });
 
-    // Issue the same JWT you use elsewhere
     const jwtToken = jwt.sign({ userId: user.id }, JWT_SECRET, {
       expiresIn: "30d",
     });
@@ -743,11 +805,9 @@ app.get("/auth/google/callback", async (req, res) => {
       "→ redirecting to /"
     );
 
-    // Important: always send a response from here
     return res.redirect("/");
   } catch (err) {
     console.error("[Google OAuth] Unexpected error in callback:", err);
-    // Always return *something* so the process doesn't crash
     return res
       .status(500)
       .send("Google login failed unexpectedly. Please try again.");
@@ -758,7 +818,7 @@ app.get("/auth/google/callback", async (req, res) => {
 // Legacy + existing auth flows
 // ---------------------------------------------------------------------
 
-// GHL webhook: create user + magic link (legacy support)
+// GHL webhook: create user + magic link
 app.post("/ghl/new-user", async (req, res) => {
   try {
     const { email, name, contactId } = req.body || {};
@@ -789,8 +849,8 @@ app.get("/login/:token", async (req, res) => {
   try {
     const result = await db.query(
       `SELECT ml.*, u.id AS user_id
-       FROM closureai_magic_links ml
-       JOIN closureai_users u ON u.id = ml.user_id
+       FROM magic_links ml
+       JOIN users u ON u.id = ml.user_id
        WHERE ml.token = $1`,
       [token]
     );
@@ -803,7 +863,6 @@ app.get("/login/:token", async (req, res) => {
 
     if (row.used_at) {
       console.log("Magic link already used:", token);
-      // Still allow login within expiry for now
     }
 
     const now = new Date();
@@ -811,12 +870,10 @@ app.get("/login/:token", async (req, res) => {
       return res.status(400).send("This link has expired.");
     }
 
-    await db.query(
-      "UPDATE closureai_magic_links SET used_at = now() WHERE id = $1",
-      [row.id]
-    );
+    await db.query("UPDATE magic_links SET used_at = now() WHERE id = $1", [
+      row.id,
+    ]);
 
-    // 🔐 30-day session to match the Holiday Pass window
     const jwtToken = jwt.sign({ userId: row.user_id }, JWT_SECRET, {
       expiresIn: "30d",
     });
@@ -836,7 +893,6 @@ app.get("/login/:token", async (req, res) => {
 });
 
 // Success page AFTER auto-login
-// Stripe will redirect here with ?session_id=cs_test_...
 app.get("/checkout/success", async (req, res) => {
   const { session_id: sessionId } = req.query;
 
@@ -849,7 +905,6 @@ app.get("/checkout/success", async (req, res) => {
 
     const { user } = await ensureUserWithHolidayPassFromSession(session);
 
-    // Issue JWT here as well (auto-login)
     const jwtToken = jwt.sign({ userId: user.id }, JWT_SECRET, {
       expiresIn: "30d",
     });
@@ -861,8 +916,7 @@ app.get("/checkout/success", async (req, res) => {
       maxAge: 30 * 24 * 60 * 60 * 1000,
     });
 
-    // Optional: you can render a nice page; for now just redirect
-    return res.redirect("/d");
+    return res.redirect("/dashboard");
   } catch (err) {
     console.error("Error in /checkout/success:", err);
     return res
@@ -871,12 +925,11 @@ app.get("/checkout/success", async (req, res) => {
   }
 });
 
-// Legacy success page (if someone hits /success directly)
+// Legacy success / cancel pages
 app.get("/success", (req, res) => {
   res.sendFile(path.join(__dirname, "views", "success.html"));
 });
 
-// Cancelled checkout
 app.get("/cancelled", (req, res) => {
   res.sendFile(path.join(__dirname, "views", "cancelled.html"));
 });
@@ -903,12 +956,11 @@ app.get("/holiday-pass", (req, res) => {
 // Authenticated JSON API
 // =========================
 
-// Get current user info
 app.get("/api/me", requireAuth, async (req, res) => {
   try {
     const result = await db.query(
       `SELECT id, email, name, ghl_contact_id, created_at, updated_at, holiday_pass_expires_at
-       FROM closureai_users
+       FROM users
        WHERE id = $1`,
       [req.user.id]
     );
@@ -920,7 +972,6 @@ app.get("/api/me", requireAuth, async (req, res) => {
     const user = result.rows[0];
 
     return res.json({
-      // snake_case as in DB
       id: user.id,
       email: user.email,
       name: user.name,
@@ -929,8 +980,6 @@ app.get("/api/me", requireAuth, async (req, res) => {
       updated_at: user.updated_at,
       holiday_pass_expires_at: user.holiday_pass_expires_at,
       holiday_pass_active: req.holidayPassActive,
-
-      // camelCase for frontend convenience
       holidayPassExpiresAt: user.holiday_pass_expires_at,
       holidayPassActive: req.holidayPassActive,
     });
@@ -955,8 +1004,9 @@ app.get("/api/sessions", requireAuth, async (req, res) => {
           input_prompt,
           created_at,
           turn_index
-        FROM closureai_sessions
+        FROM sessions
         WHERE user_id = $1
+          AND app_id = $2
       ),
       per_thread AS (
         SELECT
@@ -979,10 +1029,11 @@ app.get("/api/sessions", requireAuth, async (req, res) => {
         first_user_message
       FROM per_thread
       ORDER BY last_updated_at DESC
-      LIMIT $2
+      LIMIT $3
       `,
-      [req.user.id, limit]
+      [req.user.id, APP_ID, limit]
     );
+
 
     function makeTitle(text) {
       if (!text) return "Clarity session";
@@ -1021,13 +1072,15 @@ app.get("/api/threads/:threadId", requireAuth, async (req, res) => {
         raw_output,
         created_at,
         turn_index
-      FROM closureai_sessions
+      FROM sessions
       WHERE user_id = $1
-        AND thread_id = $2
+        AND app_id = $2
+        AND thread_id = $3
       ORDER BY turn_index ASC, created_at ASC
       `,
-      [req.user.id, threadId]
+      [req.user.id, APP_ID, threadId]
     );
+
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Thread not found" });
@@ -1058,7 +1111,7 @@ function countAssistantTurns(history) {
   return (history || []).filter((m) => m.role === "assistant").length;
 }
 
-async function callOpenAIForClosure(conversationMessages, assistantTurnsParam) {
+async function callOpenAIForClosure(conversationMessages, assistantTurnsParam, offers = [], coachName = "your coach") {
   const history = Array.isArray(conversationMessages)
     ? conversationMessages
     : [];
@@ -1068,35 +1121,17 @@ async function callOpenAIForClosure(conversationMessages, assistantTurnsParam) {
       ? assistantTurnsParam
       : countAssistantTurns(history);
 
-  const maxTurns = PROMPTS_CONFIG.maxAssistantTurns || 8;
-  const isWrapUpTurn = assistantTurns >= maxTurns - 1;
+  const maxTurns = PROMPTS_CONFIG.maxAssistantTurns || 6;
 
-  let systemPrompt = PROMPTS_CONFIG.systemPrompt;
-
-  if (isWrapUpTurn) {
-    systemPrompt += `
-    
-SESSION WRAP-UP MODE (IMPORTANT):
-
-You have already responded to this user several times in this session.
-In THIS response, gently bring the conversation to a natural stopping point.
-
-Do:
-- Give a short, structured recap of what you've heard and what matters most to them.
-- Highlight 1–3 concrete things they can remember or try next (small, doable steps).
-- Offer 1 very small closing reflection question like:
-    "What feels most important to remember from this conversation?"
-  or
-    "What feels a little lighter or clearer right now?"
-
-Do NOT:
-- Open new big lines of inquiry.
-- Ask more than ONE small closing question.
-- Encourage them to keep digging tonight.
-
-Sound warm and encouraging, and make it clear this is a good place to pause.
-`;
-  }
+  // Use the new dynamic prompt builder
+  const systemPrompt = PROMPTS_CONFIG.buildSystemPrompt({
+    basePrompt: PROMPTS_CONFIG.systemPrompt,
+    assistantTurns,
+    maxTurns,
+    offers,
+    coachName,
+    isWrapUp: false,
+  });
 
   const messages = [{ role: "system", content: systemPrompt }, ...history];
 
@@ -1113,10 +1148,14 @@ Sound warm and encouraging, and make it clear this is a good place to pause.
 // ---------------------------------------------------------------------
 // Run Closure protocol + save message in a thread
 // ---------------------------------------------------------------------
+
 app.post("/api/ai/closure", requireAuth, async (req, res) => {
   try {
     const { narrative, messages, threadId } = req.body || {};
 
+    // -----------------------------
+    // Build conversation history
+    // -----------------------------
     let conversationMessages = null;
 
     if (Array.isArray(messages) && messages.length > 0) {
@@ -1134,18 +1173,31 @@ app.post("/api/ai/closure", requireAuth, async (req, res) => {
       });
     }
 
+    // How many assistant turns so far in this thread (for wrap-up logic)
     const assistantTurns = conversationMessages.filter(
       (m) => m.role === "assistant"
     ).length;
 
+    // -----------------------------
+    // Fetch offers and coach name for this app
+    // -----------------------------
+    const offers = await getOffersForApp(APP_ID);
+    const coachName = await getCoachNameForApp(APP_ID);
+
+    // -----------------------------
+    // Call OpenAI with offer context
+    // -----------------------------
     const assistantReply = await callOpenAIForClosure(
       conversationMessages,
-      assistantTurns
+      assistantTurns,
+      offers,
+      coachName
     );
 
-    const newId = uuidv4();
-    const effectiveThreadId = threadId || newId;
+    // If no threadId was provided, this is a brand-new thread
+    const effectiveThreadId = threadId || uuidv4();
 
+    // Use the explicit narrative if provided, otherwise last user message
     const inputPrompt =
       typeof narrative === "string" && narrative.trim()
         ? narrative.trim()
@@ -1155,35 +1207,69 @@ app.post("/api/ai/closure", requireAuth, async (req, res) => {
     const cleanedOutput = assistantReply;
     const parsed = null;
 
+    // -----------------------------
+    // Persist session row
+    // -----------------------------
+    const sessionId = uuidv4();
+    const turnIndex = assistantTurns;
+
     await db.query(
-      `INSERT INTO closureai_sessions (
-         id,
-         user_id,
-         thread_id,
-         turn_index,
-         input_prompt,
-         raw_output,
-         cleaned_output
-       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `
+      INSERT INTO sessions (
+        id,
+        user_id,
+        app_id,
+        thread_id,
+        turn_index,
+        input_prompt,
+        raw_output,
+        cleaned_output
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `,
       [
-        newId,
+        sessionId,
         req.user.id,
+        APP_ID,
         effectiveThreadId,
-        assistantTurns,
+        turnIndex,
         inputPrompt,
         rawOutput,
         cleanedOutput,
       ]
     );
 
+    // -----------------------------
+    // Determine if we should return offers for UI card
+    // -----------------------------
+    const maxTurns = PROMPTS_CONFIG.maxAssistantTurns || 6;
+    const isWrapUpTurn = assistantTurns >= maxTurns - 1;
+
+    // Get offers that should show as cards
+    const cardOffers = isWrapUpTurn
+      ? offers.filter((o) => o.show_as_card && o.is_active)
+      : [];
+
+    // -----------------------------
+    // Response
+    // -----------------------------
     return res.json({
       success: true,
-      sessionId: newId,
+      sessionId,
       threadId: effectiveThreadId,
       rawOutput,
       cleanedOutput,
       parsed,
+      turnIndex: assistantTurns + 1,
+      isWrapUp: isWrapUpTurn,
+      offers: cardOffers.map((o) => ({
+        id: o.id,
+        title: o.title,
+        description: o.description,
+        url: o.url,
+        offerType: o.offer_type,
+        ctaText: o.cta_text,
+      })),
     });
   } catch (err) {
     console.error("Error in /api/ai/closure:", err);
@@ -1192,6 +1278,7 @@ app.post("/api/ai/closure", requireAuth, async (req, res) => {
     });
   }
 });
+
 
 // ---- SES test route ----
 app.get("/test/email", async (req, res) => {
@@ -1230,21 +1317,20 @@ app.post("/api/create-checkout-session", async (req, res) => {
       return res.status(400).json({ error: "Email is required" });
     }
 
-        const session = await stripe.checkout.sessions.create({
-          mode: STRIPE_CONFIG.mode,
-          payment_method_types: ["card"],
-          customer_email: normalizeEmail(email),
-          line_items: [
-            {
-              price: STRIPE_CONFIG.priceId,
-              quantity: 1,
-            },
-          ],
-          allow_promotion_codes: STRIPE_CONFIG.allowPromotionCodes,
-          success_url: STRIPE_CONFIG.getSuccessUrl(),
-          cancel_url: STRIPE_CONFIG.getCancelUrl(),
-        });
-
+    const session = await stripe.checkout.sessions.create({
+      mode: STRIPE_CONFIG.mode,
+      payment_method_types: ["card"],
+      customer_email: normalizeEmail(email),
+      line_items: [
+        {
+          price: STRIPE_CONFIG.priceId,
+          quantity: 1,
+        },
+      ],
+      allow_promotion_codes: STRIPE_CONFIG.allowPromotionCodes,
+      success_url: STRIPE_CONFIG.getSuccessUrl(),
+      cancel_url: STRIPE_CONFIG.getCancelUrl(),
+    });
 
     return res.json({ url: session.url });
   } catch (err) {
@@ -1252,6 +1338,190 @@ app.post("/api/create-checkout-session", async (req, res) => {
     return res
       .status(500)
       .json({ error: "Unable to create checkout session" });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Offer management API routes
+// ---------------------------------------------------------------------
+
+// Get all offers for the current app (admin use)
+app.get("/api/offers", requireAuth, async (req, res) => {
+  try {
+    const offers = await getOffersForApp(APP_ID, { activeOnly: false });
+    return res.json({ offers });
+  } catch (err) {
+    console.error("Error fetching offers:", err);
+    return res.status(500).json({ error: "Failed to fetch offers" });
+  }
+});
+
+// Create a new offer
+app.post("/api/offers", requireAuth, async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      url,
+      offerType = "general",
+      triggerKeywords = [],
+      aiMentionText,
+      displayOrder = 0,
+      showInline = true,
+      showAtWrapup = true,
+      showAsCard = true,
+      ctaText = "Learn More",
+    } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ error: "Title is required" });
+    }
+
+    const result = await db.query(
+      `INSERT INTO offers (
+        app_id, title, description, url, offer_type,
+        trigger_keywords, ai_mention_text, display_order,
+        show_inline, show_at_wrapup, show_as_card, cta_text
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      RETURNING *`,
+      [
+        APP_ID,
+        title,
+        description,
+        url,
+        offerType,
+        triggerKeywords,
+        aiMentionText,
+        displayOrder,
+        showInline,
+        showAtWrapup,
+        showAsCard,
+        ctaText,
+      ]
+    );
+
+    return res.json({ offer: result.rows[0] });
+  } catch (err) {
+    console.error("Error creating offer:", err);
+    return res.status(500).json({ error: "Failed to create offer" });
+  }
+});
+
+// Update an offer
+app.put("/api/offers/:offerId", requireAuth, async (req, res) => {
+  try {
+    const { offerId } = req.params;
+    const {
+      title,
+      description,
+      url,
+      offerType,
+      triggerKeywords,
+      aiMentionText,
+      displayOrder,
+      isActive,
+      showInline,
+      showAtWrapup,
+      showAsCard,
+      ctaText,
+    } = req.body;
+
+    // Build dynamic update query
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (title !== undefined) {
+      updates.push(`title = $${paramIndex++}`);
+      values.push(title);
+    }
+    if (description !== undefined) {
+      updates.push(`description = $${paramIndex++}`);
+      values.push(description);
+    }
+    if (url !== undefined) {
+      updates.push(`url = $${paramIndex++}`);
+      values.push(url);
+    }
+    if (offerType !== undefined) {
+      updates.push(`offer_type = $${paramIndex++}`);
+      values.push(offerType);
+    }
+    if (triggerKeywords !== undefined) {
+      updates.push(`trigger_keywords = $${paramIndex++}`);
+      values.push(triggerKeywords);
+    }
+    if (aiMentionText !== undefined) {
+      updates.push(`ai_mention_text = $${paramIndex++}`);
+      values.push(aiMentionText);
+    }
+    if (displayOrder !== undefined) {
+      updates.push(`display_order = $${paramIndex++}`);
+      values.push(displayOrder);
+    }
+    if (isActive !== undefined) {
+      updates.push(`is_active = $${paramIndex++}`);
+      values.push(isActive);
+    }
+    if (showInline !== undefined) {
+      updates.push(`show_inline = $${paramIndex++}`);
+      values.push(showInline);
+    }
+    if (showAtWrapup !== undefined) {
+      updates.push(`show_at_wrapup = $${paramIndex++}`);
+      values.push(showAtWrapup);
+    }
+    if (showAsCard !== undefined) {
+      updates.push(`show_as_card = $${paramIndex++}`);
+      values.push(showAsCard);
+    }
+    if (ctaText !== undefined) {
+      updates.push(`cta_text = $${paramIndex++}`);
+      values.push(ctaText);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "No fields to update" });
+    }
+
+    values.push(offerId, APP_ID);
+
+    const result = await db.query(
+      `UPDATE offers SET ${updates.join(", ")}
+       WHERE id = $${paramIndex++} AND app_id = $${paramIndex}
+       RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Offer not found" });
+    }
+
+    return res.json({ offer: result.rows[0] });
+  } catch (err) {
+    console.error("Error updating offer:", err);
+    return res.status(500).json({ error: "Failed to update offer" });
+  }
+});
+
+// Delete an offer
+app.delete("/api/offers/:offerId", requireAuth, async (req, res) => {
+  try {
+    const { offerId } = req.params;
+
+    const result = await db.query(
+      `DELETE FROM offers WHERE id = $1 AND app_id = $2 RETURNING id`,
+      [offerId, APP_ID]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Offer not found" });
+    }
+
+    return res.json({ deleted: true });
+  } catch (err) {
+    console.error("Error deleting offer:", err);
+    return res.status(500).json({ error: "Failed to delete offer" });
   }
 });
 
@@ -1267,5 +1537,7 @@ app.use((req, res) => {
 
 // ---- Server start ----
 app.listen(PORT, () => {
-  console.log(`${APP_CONFIG.appName} API running on port ${PORT}`);
+  console.log(
+    `${APP_CONFIG.appName} API running on port ${PORT} [slug=${APP_SLUG}]`
+  );
 });
