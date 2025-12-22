@@ -240,6 +240,7 @@
             <div class="badge-soft" id="header-user">
               Signed in as <strong>—</strong>
             </div>
+            <a href="/admin" id="admin-link" class="btn btn-ghost" style="display: none; font-size: 13px;">Admin</a>
             <button id="logout-btn" class="btn btn-ghost">Log out</button>
           </div>
         </div>
@@ -363,6 +364,12 @@
               "Signed in as <strong>" +
               (data.email || data.name || "you") +
               "</strong>";
+          }
+
+          // Show admin link if user is admin
+          if (data.isAdmin) {
+            const adminLink = document.getElementById("admin-link");
+            if (adminLink) adminLink.style.display = "inline-flex";
           }
 
           if (data.holidayPassActive) {

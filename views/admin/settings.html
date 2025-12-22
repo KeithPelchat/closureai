@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Settings - {{APP_NAME}} Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <div class="admin-shell">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <a href="/admin" class="admin-sidebar-brand">
+          <div class="admin-sidebar-brand-mark"></div>
+          <div>
+            <div class="admin-sidebar-title">{{APP_NAME}}</div>
+            <div class="admin-badge">Admin</div>
+          </div>
+        </a>
+      </div>
+
+      <nav class="admin-sidebar-nav">
+        <a href="/admin" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          Dashboard
+        </a>
+        <a href="/admin/users" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Users
+        </a>
+        <a href="/admin/sessions" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Sessions
+        </a>
+        <a href="/admin/offers" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          Offers
+        </a>
+        <a href="/admin/settings" class="admin-nav-item active">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Settings
+        </a>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <a href="/dashboard" class="admin-back-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back to App
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <header class="admin-header">
+        <h1 class="admin-header-title">Settings</h1>
+      </header>
+
+      <div class="admin-content">
+        <!-- Coach Settings -->
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Coach Settings</h2>
+          </div>
+          <div class="admin-card-body">
+            <div class="admin-form-group">
+              <label class="admin-form-label">Coach Name</label>
+              <input type="text" class="admin-form-input" id="coach-name" placeholder="e.g., Sarah" style="max-width: 300px;" />
+              <p style="font-size: 12px; color: #64748b; margin-top: 6px;">
+                This name is used in AI responses (e.g., "your coach Sarah suggests...")
+              </p>
+            </div>
+
+            <button class="btn-admin btn-admin-primary" onclick="saveCoachSettings()" id="save-coach-btn">
+              Save Changes
+            </button>
+          </div>
+        </div>
+
+        <!-- App Info (Read-only) -->
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">App Information</h2>
+          </div>
+          <div class="admin-card-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+              <div>
+                <label class="admin-form-label">App Name</label>
+                <p style="font-size: 15px; color: #1e293b; margin: 4px 0 0;">{{APP_NAME}}</p>
+              </div>
+              <div>
+                <label class="admin-form-label">App Slug</label>
+                <p style="font-size: 15px; color: #1e293b; margin: 4px 0 0;" id="app-slug">Loading...</p>
+              </div>
+              <div>
+                <label class="admin-form-label">Base URL</label>
+                <p style="font-size: 15px; color: #1e293b; margin: 4px 0 0;" id="app-base-url">Loading...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Current Prompt (Read-only) -->
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">AI System Prompt</h2>
+            <span style="font-size: 12px; color: #64748b;">Read-only</span>
+          </div>
+          <div class="admin-card-body">
+            <div style="background: #f8fafc; border-radius: 10px; padding: 16px; max-height: 300px; overflow-y: auto;">
+              <pre style="font-size: 13px; color: #475569; white-space: pre-wrap; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;" id="system-prompt">Loading...</pre>
+            </div>
+            <p style="font-size: 12px; color: #64748b; margin-top: 12px;">
+              To modify the system prompt, edit <code>config/promptsConfig.js</code> on the server.
+            </p>
+          </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="admin-card" style="border-color: #fecaca;">
+          <div class="admin-card-header" style="background: #fef2f2;">
+            <h2 class="admin-card-title" style="color: #dc2626;">Danger Zone</h2>
+          </div>
+          <div class="admin-card-body">
+            <p style="font-size: 14px; color: #64748b; margin-bottom: 16px;">
+              These actions are destructive and cannot be undone.
+            </p>
+            <button class="btn-admin btn-admin-danger" onclick="clearAllSessions()" disabled title="Coming soon">
+              Clear All Sessions
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/admin.js"></script>
+  <script>
+    // Load app settings
+    async function loadSettings() {
+      try {
+        const data = await adminFetch("/api/admin/app");
+
+        document.getElementById("coach-name").value = data.coachName || "";
+        document.getElementById("app-slug").textContent = data.slug || "-";
+        document.getElementById("app-base-url").textContent = data.baseUrl || "-";
+        document.getElementById("system-prompt").textContent = data.systemPrompt || "No prompt configured";
+      } catch (err) {
+        console.error("Failed to load settings:", err);
+        showToast("Failed to load settings", "error");
+      }
+    }
+
+    // Save coach settings
+    async function saveCoachSettings() {
+      const coachName = document.getElementById("coach-name").value.trim();
+      const btn = document.getElementById("save-coach-btn");
+
+      btn.disabled = true;
+      btn.textContent = "Saving...";
+
+      try {
+        await adminFetch("/api/admin/app", {
+          method: "PATCH",
+          body: JSON.stringify({ coachName }),
+        });
+
+        showToast("Settings saved");
+      } catch (err) {
+        console.error("Failed to save settings:", err);
+        showToast("Failed to save settings: " + err.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Save Changes";
+      }
+    }
+
+    // Clear all sessions (placeholder)
+    async function clearAllSessions() {
+      const confirmed = await confirmAction("Are you sure you want to delete ALL sessions? This cannot be undone.");
+      if (!confirmed) return;
+
+      showToast("This feature is not yet implemented", "info");
+    }
+
+    // Initialize
+    loadSettings();
+  </script>
+</body>
+</html>

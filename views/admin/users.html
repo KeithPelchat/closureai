@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>User Management - {{APP_NAME}} Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <div class="admin-shell">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <a href="/admin" class="admin-sidebar-brand">
+          <div class="admin-sidebar-brand-mark"></div>
+          <div>
+            <div class="admin-sidebar-title">{{APP_NAME}}</div>
+            <div class="admin-badge">Admin</div>
+          </div>
+        </a>
+      </div>
+
+      <nav class="admin-sidebar-nav">
+        <a href="/admin" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          Dashboard
+        </a>
+        <a href="/admin/users" class="admin-nav-item active">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Users
+        </a>
+        <a href="/admin/sessions" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Sessions
+        </a>
+        <a href="/admin/offers" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          Offers
+        </a>
+        <a href="/admin/settings" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Settings
+        </a>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <a href="/dashboard" class="admin-back-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back to App
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <header class="admin-header">
+        <h1 class="admin-header-title">Users</h1>
+        <div class="admin-header-actions">
+          <div class="admin-search">
+            <svg class="admin-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" class="admin-search-input" id="search-input" placeholder="Search by email..." />
+          </div>
+        </div>
+      </header>
+
+      <div class="admin-content">
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">All Users</h2>
+            <span id="user-count" style="font-size: 13px; color: #64748b;">Loading...</span>
+          </div>
+          <div class="admin-card-body admin-table-responsive" id="users-table">
+            <div class="admin-loading">
+              <div class="admin-spinner"></div>
+            </div>
+          </div>
+          <div class="admin-card-footer" id="pagination"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Edit User Modal -->
+  <div class="admin-modal-overlay" id="edit-user-modal">
+    <div class="admin-modal">
+      <div class="admin-modal-header">
+        <h3 class="admin-modal-title">Edit User</h3>
+        <button class="admin-modal-close" onclick="closeModal('edit-user-modal')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="admin-modal-body">
+        <input type="hidden" id="edit-user-id" />
+
+        <div class="admin-form-group">
+          <label class="admin-form-label">Email</label>
+          <input type="email" class="admin-form-input" id="edit-user-email" disabled />
+        </div>
+
+        <div class="admin-form-group">
+          <label class="admin-form-label">Name</label>
+          <input type="text" class="admin-form-input" id="edit-user-name" placeholder="User name" />
+        </div>
+
+        <div class="admin-form-group">
+          <label class="admin-form-label">{{HOLIDAY_PASS_NAME}} Expires</label>
+          <input type="datetime-local" class="admin-form-input" id="edit-user-pass-expires" />
+          <p style="font-size: 12px; color: #64748b; margin-top: 6px;">
+            Set or extend the user's pass expiration date
+          </p>
+        </div>
+
+        <div class="admin-form-group">
+          <label class="admin-form-checkbox">
+            <input type="checkbox" id="edit-user-is-admin" />
+            <span>Admin privileges</span>
+          </label>
+          <p style="font-size: 12px; color: #64748b; margin-top: 6px;">
+            Allow this user to access the admin dashboard
+          </p>
+        </div>
+      </div>
+      <div class="admin-modal-footer">
+        <button class="btn-admin btn-admin-secondary" onclick="closeModal('edit-user-modal')">Cancel</button>
+        <button class="btn-admin btn-admin-primary" onclick="saveUser()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/admin.js"></script>
+  <script>
+    let currentPage = 1;
+    const limit = 20;
+    let searchQuery = "";
+
+    // Load users
+    async function loadUsers(page = 1) {
+      currentPage = page;
+      const container = document.getElementById("users-table");
+      showLoading(container);
+
+      try {
+        const params = new URLSearchParams({ page, limit });
+        if (searchQuery) params.set("search", searchQuery);
+
+        const data = await adminFetch(`/api/admin/users?${params}`);
+
+        document.getElementById("user-count").textContent = `${data.pagination.total} users`;
+
+        if (!data.users || data.users.length === 0) {
+          showEmptyState(container, "No users found", searchQuery ? "Try a different search term" : "Users will appear here once they sign up.");
+          document.getElementById("pagination").innerHTML = "";
+          return;
+        }
+
+        container.innerHTML = `
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Name</th>
+                <th>Pass Status</th>
+                <th>Sessions</th>
+                <th>Joined</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.users.map(u => `
+                <tr>
+                  <td>
+                    ${escapeHtml(u.email)}
+                    ${u.isAdmin ? '<span class="admin-badge" style="margin-left: 8px;">Admin</span>' : ''}
+                  </td>
+                  <td>${escapeHtml(u.name || "-")}</td>
+                  <td>${getStatusBadge(u.holidayPassActive, u.holidayPassExpiresAt)}</td>
+                  <td>${u.sessionCount || 0}</td>
+                  <td>${formatDate(u.createdAt)}</td>
+                  <td>
+                    <button class="btn-admin btn-admin-secondary btn-admin-sm" onclick='editUser(${JSON.stringify(u)})'>
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+
+        renderPagination(document.getElementById("pagination"), data.pagination);
+      } catch (err) {
+        console.error("Failed to load users:", err);
+        container.innerHTML = '<p style="color: #ef4444; text-align: center;">Failed to load users</p>';
+      }
+    }
+
+    function goToPage(page) {
+      if (page < 1) return;
+      loadUsers(page);
+    }
+
+    // Edit user modal
+    function editUser(user) {
+      document.getElementById("edit-user-id").value = user.id;
+      document.getElementById("edit-user-email").value = user.email;
+      document.getElementById("edit-user-name").value = user.name || "";
+      document.getElementById("edit-user-is-admin").checked = user.isAdmin || false;
+
+      // Format date for datetime-local input
+      if (user.holidayPassExpiresAt) {
+        const date = new Date(user.holidayPassExpiresAt);
+        const formatted = date.toISOString().slice(0, 16);
+        document.getElementById("edit-user-pass-expires").value = formatted;
+      } else {
+        document.getElementById("edit-user-pass-expires").value = "";
+      }
+
+      openModal("edit-user-modal");
+    }
+
+    // Save user changes
+    async function saveUser() {
+      const userId = document.getElementById("edit-user-id").value;
+      const name = document.getElementById("edit-user-name").value.trim();
+      const isAdmin = document.getElementById("edit-user-is-admin").checked;
+      const passExpires = document.getElementById("edit-user-pass-expires").value;
+
+      try {
+        const body = { name, isAdmin };
+        if (passExpires) {
+          body.holidayPassExpiresAt = new Date(passExpires).toISOString();
+        }
+
+        await adminFetch(`/api/admin/users/${userId}`, {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        });
+
+        closeModal("edit-user-modal");
+        showToast("User updated successfully");
+        loadUsers(currentPage);
+      } catch (err) {
+        console.error("Failed to save user:", err);
+        showToast("Failed to update user: " + err.message, "error");
+      }
+    }
+
+    // Search
+    const searchInput = document.getElementById("search-input");
+    searchInput.addEventListener("input", debounce((e) => {
+      searchQuery = e.target.value.trim();
+      loadUsers(1);
+    }, 300));
+
+    // Initialize
+    loadUsers();
+  </script>
+</body>
+</html>

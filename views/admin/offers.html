@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Offer Management - {{APP_NAME}} Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <div class="admin-shell">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <a href="/admin" class="admin-sidebar-brand">
+          <div class="admin-sidebar-brand-mark"></div>
+          <div>
+            <div class="admin-sidebar-title">{{APP_NAME}}</div>
+            <div class="admin-badge">Admin</div>
+          </div>
+        </a>
+      </div>
+
+      <nav class="admin-sidebar-nav">
+        <a href="/admin" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          Dashboard
+        </a>
+        <a href="/admin/users" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Users
+        </a>
+        <a href="/admin/sessions" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Sessions
+        </a>
+        <a href="/admin/offers" class="admin-nav-item active">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          Offers
+        </a>
+        <a href="/admin/settings" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Settings
+        </a>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <a href="/dashboard" class="admin-back-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back to App
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <header class="admin-header">
+        <h1 class="admin-header-title">Offers</h1>
+        <div class="admin-header-actions">
+          <button class="btn-admin btn-admin-primary" onclick="openCreateModal()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Create Offer
+          </button>
+        </div>
+      </header>
+
+      <div class="admin-content">
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">All Offers</h2>
+            <span id="offer-count" style="font-size: 13px; color: #64748b;">Loading...</span>
+          </div>
+          <div class="admin-card-body" id="offers-list">
+            <div class="admin-loading">
+              <div class="admin-spinner"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Create/Edit Offer Modal -->
+  <div class="admin-modal-overlay" id="offer-modal">
+    <div class="admin-modal" style="max-width: 600px;">
+      <div class="admin-modal-header">
+        <h3 class="admin-modal-title" id="modal-title">Create Offer</h3>
+        <button class="admin-modal-close" onclick="closeModal('offer-modal')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="admin-modal-body">
+        <input type="hidden" id="offer-id" />
+
+        <div class="admin-form-group">
+          <label class="admin-form-label">Title *</label>
+          <input type="text" class="admin-form-input" id="offer-title" placeholder="e.g., Book a Free Call" />
+        </div>
+
+        <div class="admin-form-group">
+          <label class="admin-form-label">Description</label>
+          <textarea class="admin-form-input admin-form-textarea" id="offer-description" placeholder="Brief description of the offer"></textarea>
+        </div>
+
+        <div class="admin-form-group">
+          <label class="admin-form-label">URL</label>
+          <input type="url" class="admin-form-input" id="offer-url" placeholder="https://..." />
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="admin-form-group">
+            <label class="admin-form-label">Offer Type</label>
+            <select class="admin-form-input admin-form-select" id="offer-type">
+              <option value="general">General</option>
+              <option value="call">Free Call</option>
+              <option value="course">Course</option>
+              <option value="coaching">Coaching</option>
+              <option value="resource">Resource</option>
+            </select>
+          </div>
+
+          <div class="admin-form-group">
+            <label class="admin-form-label">CTA Text</label>
+            <input type="text" class="admin-form-input" id="offer-cta" placeholder="Learn More" />
+          </div>
+        </div>
+
+        <div class="admin-form-group">
+          <label class="admin-form-label">AI Mention Text (Optional)</label>
+          <textarea class="admin-form-input admin-form-textarea" id="offer-ai-text" placeholder="Suggested phrasing for AI to mention this offer" style="min-height: 60px;"></textarea>
+          <p style="font-size: 12px; color: #64748b; margin-top: 6px;">
+            The AI can naturally mention this offer during conversations
+          </p>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 16px;">
+          <label class="admin-form-checkbox">
+            <input type="checkbox" id="offer-show-inline" checked />
+            <span>Show inline (mid-conversation)</span>
+          </label>
+          <label class="admin-form-checkbox">
+            <input type="checkbox" id="offer-show-wrapup" checked />
+            <span>Show at wrap-up</span>
+          </label>
+          <label class="admin-form-checkbox">
+            <input type="checkbox" id="offer-show-card" checked />
+            <span>Show as card</span>
+          </label>
+        </div>
+      </div>
+      <div class="admin-modal-footer">
+        <button class="btn-admin btn-admin-secondary" onclick="closeModal('offer-modal')">Cancel</button>
+        <button class="btn-admin btn-admin-primary" onclick="saveOffer()">Save Offer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/admin.js"></script>
+  <script>
+    // Load offers
+    async function loadOffers() {
+      const container = document.getElementById("offers-list");
+      showLoading(container);
+
+      try {
+        const data = await adminFetch("/api/admin/offers");
+
+        document.getElementById("offer-count").textContent = `${data.offers?.length || 0} offers`;
+
+        if (!data.offers || data.offers.length === 0) {
+          showEmptyState(container, "No offers yet", "Create your first offer to show users during sessions.");
+          return;
+        }
+
+        container.innerHTML = data.offers.map(offer => `
+          <div class="offer-item" style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            background: ${offer.is_active ? '#ffffff' : '#f8fafc'};
+            opacity: ${offer.is_active ? '1' : '0.7'};
+          ">
+            <div style="flex: 1;">
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                <strong style="font-size: 15px;">${escapeHtml(offer.title)}</strong>
+                <span class="status-badge ${offer.is_active ? 'active' : 'expired'}">
+                  ${offer.is_active ? 'Active' : 'Inactive'}
+                </span>
+                <span style="font-size: 12px; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">
+                  ${escapeHtml(offer.offer_type || 'general')}
+                </span>
+              </div>
+              <p style="font-size: 13px; color: #64748b; margin: 0;">
+                ${escapeHtml(offer.description || 'No description')}
+              </p>
+              ${offer.url ? `<a href="${escapeHtml(offer.url)}" target="_blank" style="font-size: 12px; color: #0ea5e9;">${escapeHtml(truncate(offer.url, 50))}</a>` : ''}
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <label class="toggle-switch" title="Toggle active status">
+                <input type="checkbox" ${offer.is_active ? 'checked' : ''} onchange="toggleOffer('${offer.id}', this.checked)" />
+                <span class="toggle-slider"></span>
+              </label>
+              <button class="btn-admin btn-admin-secondary btn-admin-sm" onclick='editOffer(${JSON.stringify(offer)})'>
+                Edit
+              </button>
+              <button class="btn-admin btn-admin-danger btn-admin-sm" onclick="deleteOffer('${offer.id}', '${escapeHtml(offer.title)}')">
+                Delete
+              </button>
+            </div>
+          </div>
+        `).join("");
+      } catch (err) {
+        console.error("Failed to load offers:", err);
+        container.innerHTML = '<p style="color: #ef4444; text-align: center;">Failed to load offers</p>';
+      }
+    }
+
+    // Open create modal
+    function openCreateModal() {
+      document.getElementById("modal-title").textContent = "Create Offer";
+      document.getElementById("offer-id").value = "";
+      document.getElementById("offer-title").value = "";
+      document.getElementById("offer-description").value = "";
+      document.getElementById("offer-url").value = "";
+      document.getElementById("offer-type").value = "general";
+      document.getElementById("offer-cta").value = "Learn More";
+      document.getElementById("offer-ai-text").value = "";
+      document.getElementById("offer-show-inline").checked = true;
+      document.getElementById("offer-show-wrapup").checked = true;
+      document.getElementById("offer-show-card").checked = true;
+      openModal("offer-modal");
+    }
+
+    // Edit offer
+    function editOffer(offer) {
+      document.getElementById("modal-title").textContent = "Edit Offer";
+      document.getElementById("offer-id").value = offer.id;
+      document.getElementById("offer-title").value = offer.title || "";
+      document.getElementById("offer-description").value = offer.description || "";
+      document.getElementById("offer-url").value = offer.url || "";
+      document.getElementById("offer-type").value = offer.offer_type || "general";
+      document.getElementById("offer-cta").value = offer.cta_text || "Learn More";
+      document.getElementById("offer-ai-text").value = offer.ai_mention_text || "";
+      document.getElementById("offer-show-inline").checked = offer.show_inline !== false;
+      document.getElementById("offer-show-wrapup").checked = offer.show_at_wrapup !== false;
+      document.getElementById("offer-show-card").checked = offer.show_as_card !== false;
+      openModal("offer-modal");
+    }
+
+    // Save offer
+    async function saveOffer() {
+      const offerId = document.getElementById("offer-id").value;
+      const title = document.getElementById("offer-title").value.trim();
+
+      if (!title) {
+        showToast("Title is required", "error");
+        return;
+      }
+
+      const body = {
+        title,
+        description: document.getElementById("offer-description").value.trim(),
+        url: document.getElementById("offer-url").value.trim(),
+        offerType: document.getElementById("offer-type").value,
+        ctaText: document.getElementById("offer-cta").value.trim() || "Learn More",
+        aiMentionText: document.getElementById("offer-ai-text").value.trim(),
+        showInline: document.getElementById("offer-show-inline").checked,
+        showAtWrapup: document.getElementById("offer-show-wrapup").checked,
+        showAsCard: document.getElementById("offer-show-card").checked,
+      };
+
+      try {
+        if (offerId) {
+          // Update
+          await adminFetch(`/api/admin/offers/${offerId}`, {
+            method: "PUT",
+            body: JSON.stringify(body),
+          });
+          showToast("Offer updated");
+        } else {
+          // Create
+          await adminFetch("/api/admin/offers", {
+            method: "POST",
+            body: JSON.stringify(body),
+          });
+          showToast("Offer created");
+        }
+
+        closeModal("offer-modal");
+        loadOffers();
+      } catch (err) {
+        console.error("Failed to save offer:", err);
+        showToast("Failed to save offer: " + err.message, "error");
+      }
+    }
+
+    // Toggle offer active status
+    async function toggleOffer(offerId, isActive) {
+      try {
+        await adminFetch(`/api/admin/offers/${offerId}`, {
+          method: "PUT",
+          body: JSON.stringify({ isActive }),
+        });
+        showToast(isActive ? "Offer activated" : "Offer deactivated");
+      } catch (err) {
+        console.error("Failed to toggle offer:", err);
+        showToast("Failed to toggle offer", "error");
+        loadOffers(); // Reload to reset toggle state
+      }
+    }
+
+    // Delete offer
+    async function deleteOffer(offerId, title) {
+      const confirmed = await confirmAction(`Are you sure you want to delete "${title}"?`);
+      if (!confirmed) return;
+
+      try {
+        await adminFetch(`/api/admin/offers/${offerId}`, {
+          method: "DELETE",
+        });
+        showToast("Offer deleted");
+        loadOffers();
+      } catch (err) {
+        console.error("Failed to delete offer:", err);
+        showToast("Failed to delete offer: " + err.message, "error");
+      }
+    }
+
+    // Initialize
+    loadOffers();
+  </script>
+</body>
+</html>

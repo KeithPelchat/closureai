@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Admin Dashboard - {{APP_NAME}}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <div class="admin-shell">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <a href="/admin" class="admin-sidebar-brand">
+          <div class="admin-sidebar-brand-mark"></div>
+          <div>
+            <div class="admin-sidebar-title">{{APP_NAME}}</div>
+            <div class="admin-badge">Admin</div>
+          </div>
+        </a>
+      </div>
+
+      <nav class="admin-sidebar-nav">
+        <a href="/admin" class="admin-nav-item active">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          Dashboard
+        </a>
+        <a href="/admin/users" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Users
+        </a>
+        <a href="/admin/sessions" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Sessions
+        </a>
+        <a href="/admin/offers" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          Offers
+        </a>
+        <a href="/admin/settings" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Settings
+        </a>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <a href="/dashboard" class="admin-back-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back to App
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <header class="admin-header">
+        <h1 class="admin-header-title">Dashboard</h1>
+        <div class="admin-header-actions">
+          <span class="admin-user-info" id="admin-user-email">Loading...</span>
+          <button class="btn-admin btn-admin-secondary btn-admin-sm" onclick="logout()">Logout</button>
+        </div>
+      </header>
+
+      <div class="admin-content">
+        <!-- Stats Grid -->
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card">
+            <div class="stat-card-label">Total Users</div>
+            <div class="stat-card-value" id="stat-total-users">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Active Passes</div>
+            <div class="stat-card-value" id="stat-active-passes">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Total Sessions</div>
+            <div class="stat-card-value" id="stat-total-sessions">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Avg. Turns/Session</div>
+            <div class="stat-card-value" id="stat-avg-turns">-</div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Quick Actions</h2>
+          </div>
+          <div class="admin-card-body" style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <a href="/admin/users" class="btn-admin btn-admin-primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              Manage Users
+            </a>
+            <a href="/admin/offers" class="btn-admin btn-admin-secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Create Offer
+            </a>
+            <a href="/admin/sessions" class="btn-admin btn-admin-secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              View Sessions
+            </a>
+          </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Recent Sessions</h2>
+            <a href="/admin/sessions" class="btn-admin btn-admin-secondary btn-admin-sm">View All</a>
+          </div>
+          <div class="admin-card-body" id="recent-sessions">
+            <div class="admin-loading">
+              <div class="admin-spinner"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/admin.js"></script>
+  <script>
+    // Load admin info
+    async function loadAdminInfo() {
+      try {
+        const data = await adminFetch("/api/me");
+        document.getElementById("admin-user-email").textContent = data.email;
+      } catch (err) {
+        console.error("Failed to load admin info:", err);
+      }
+    }
+
+    // Load dashboard stats
+    async function loadStats() {
+      try {
+        const data = await adminFetch("/api/admin/analytics/overview");
+        document.getElementById("stat-total-users").textContent = formatNumber(data.totalUsers);
+        document.getElementById("stat-active-passes").textContent = formatNumber(data.activePassUsers);
+        document.getElementById("stat-total-sessions").textContent = formatNumber(data.totalSessions);
+        document.getElementById("stat-avg-turns").textContent = data.avgTurnsPerThread
+          ? data.avgTurnsPerThread.toFixed(1)
+          : "-";
+      } catch (err) {
+        console.error("Failed to load stats:", err);
+      }
+    }
+
+    // Load recent sessions
+    async function loadRecentSessions() {
+      const container = document.getElementById("recent-sessions");
+      try {
+        const data = await adminFetch("/api/admin/sessions?limit=5");
+
+        if (!data.sessions || data.sessions.length === 0) {
+          showEmptyState(container, "No sessions yet", "Sessions will appear here once users start chatting.");
+          return;
+        }
+
+        container.innerHTML = `
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Preview</th>
+                <th>Turns</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.sessions.map(s => `
+                <tr>
+                  <td>${escapeHtml(s.userEmail || "Unknown")}</td>
+                  <td>${escapeHtml(truncate(s.firstMessage || "-", 60))}</td>
+                  <td>${s.turnCount || 0}</td>
+                  <td>${formatRelativeTime(s.lastUpdatedAt)}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      } catch (err) {
+        console.error("Failed to load recent sessions:", err);
+        container.innerHTML = '<p style="color: #64748b; text-align: center;">Failed to load sessions</p>';
+      }
+    }
+
+    // Logout
+    async function logout() {
+      try {
+        await fetch("/auth/logout", { method: "POST", credentials: "include" });
+        window.location.href = "/login";
+      } catch (err) {
+        console.error("Logout failed:", err);
+      }
+    }
+
+    // Initialize
+    loadAdminInfo();
+    loadStats();
+    loadRecentSessions();
+  </script>
+</body>
+</html>

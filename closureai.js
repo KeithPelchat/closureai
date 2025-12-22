@@ -488,6 +488,54 @@ function respondHolidayPassExpired(req, res) {
 }
 
 // ---------------------------------------------------------------------
+// Admin auth middleware
+// ---------------------------------------------------------------------
+
+async function requireAdmin(req, res, next) {
+  const token = req.cookies.closureai_auth;
+
+  if (!token) {
+    return respondUnauthorized(req, res);
+  }
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+
+    const result = await db.query(
+      "SELECT * FROM users WHERE id = $1 AND app_id = $2",
+      [payload.userId, APP_ID]
+    );
+
+    if (result.rows.length === 0) {
+      return respondUnauthorized(req, res);
+    }
+
+    const user = result.rows[0];
+
+    // Check admin flag
+    if (!user.is_admin) {
+      if (wantsJsonResponse(req)) {
+        return res.status(403).json({
+          ok: false,
+          code: "ADMIN_REQUIRED",
+          message: "Admin access required",
+        });
+      }
+      return res.status(403).send("Admin access required");
+    }
+
+    req.user = user;
+    req.holidayPassActive = hasActiveHolidayPass(user);
+    req.holidayPassExpiresAt = user.holiday_pass_expires_at;
+
+    return next();
+  } catch (err) {
+    console.error("requireAdmin error:", err);
+    return respondUnauthorized(req, res);
+  }
+}
+
+// ---------------------------------------------------------------------
 // Stripe helpers
 // ---------------------------------------------------------------------
 
@@ -959,7 +1007,7 @@ app.get("/holiday-pass", (req, res) => {
 app.get("/api/me", requireAuth, async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT id, email, name, ghl_contact_id, created_at, updated_at, holiday_pass_expires_at
+      `SELECT id, email, name, ghl_contact_id, created_at, updated_at, holiday_pass_expires_at, is_admin
        FROM users
        WHERE id = $1`,
       [req.user.id]
@@ -982,6 +1030,7 @@ app.get("/api/me", requireAuth, async (req, res) => {
       holiday_pass_active: req.holidayPassActive,
       holidayPassExpiresAt: user.holiday_pass_expires_at,
       holidayPassActive: req.holidayPassActive,
+      isAdmin: user.is_admin || false,
     });
   } catch (err) {
     console.error("Error in /api/me:", err);
@@ -1522,6 +1571,699 @@ app.delete("/api/offers/:offerId", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("Error deleting offer:", err);
     return res.status(500).json({ error: "Failed to delete offer" });
+  }
+});
+
+// =====================================================================
+// ADMIN DASHBOARD ROUTES
+// =====================================================================
+
+// Admin page routes
+app.get("/admin", requireAdmin, (req, res) => {
+  const filePath = path.join(__dirname, "views", "admin", "dashboard.html");
+  renderHtmlTemplate(res, filePath);
+});
+
+app.get("/admin/users", requireAdmin, (req, res) => {
+  const filePath = path.join(__dirname, "views", "admin", "users.html");
+  renderHtmlTemplate(res, filePath);
+});
+
+app.get("/admin/sessions", requireAdmin, (req, res) => {
+  const filePath = path.join(__dirname, "views", "admin", "sessions.html");
+  renderHtmlTemplate(res, filePath);
+});
+
+app.get("/admin/offers", requireAdmin, (req, res) => {
+  const filePath = path.join(__dirname, "views", "admin", "offers.html");
+  renderHtmlTemplate(res, filePath);
+});
+
+app.get("/admin/settings", requireAdmin, (req, res) => {
+  const filePath = path.join(__dirname, "views", "admin", "settings.html");
+  renderHtmlTemplate(res, filePath);
+});
+
+// ---------------------------------------------------------------------
+// Admin API: User Management
+// ---------------------------------------------------------------------
+
+// List all users for this app
+app.get("/api/admin/users", requireAdmin, async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+    const search = req.query.search ? req.query.search.trim().toLowerCase() : null;
+
+    let whereClause = "WHERE u.app_id = $1";
+    const params = [APP_ID];
+
+    if (search) {
+      params.push(`%${search}%`);
+      whereClause += ` AND (LOWER(u.email) LIKE $${params.length} OR LOWER(u.name) LIKE $${params.length})`;
+    }
+
+    // Get total count
+    const countResult = await db.query(
+      `SELECT COUNT(*) FROM users u ${whereClause}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    // Get users with session counts
+    const result = await db.query(
+      `SELECT
+        u.id,
+        u.email,
+        u.name,
+        u.is_admin,
+        u.holiday_pass_expires_at,
+        u.created_at,
+        COUNT(DISTINCT s.thread_id) AS session_count,
+        MAX(s.created_at) AS last_session_at
+      FROM users u
+      LEFT JOIN sessions s ON s.user_id = u.id AND s.app_id = $1
+      ${whereClause}
+      GROUP BY u.id
+      ORDER BY u.created_at DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset]
+    );
+
+    const now = new Date();
+    const users = result.rows.map((u) => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      isAdmin: u.is_admin || false,
+      holidayPassExpiresAt: u.holiday_pass_expires_at,
+      holidayPassActive: u.holiday_pass_expires_at ? new Date(u.holiday_pass_expires_at) >= now : false,
+      createdAt: u.created_at,
+      sessionCount: parseInt(u.session_count, 10) || 0,
+      lastSessionAt: u.last_session_at,
+    }));
+
+    return res.json({
+      users,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error("Error in GET /api/admin/users:", err);
+    return res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+// Get single user details
+app.get("/api/admin/users/:userId", requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const result = await db.query(
+      `SELECT
+        u.*,
+        COUNT(DISTINCT s.thread_id) AS session_count
+      FROM users u
+      LEFT JOIN sessions s ON s.user_id = u.id AND s.app_id = $1
+      WHERE u.id = $2 AND u.app_id = $1
+      GROUP BY u.id`,
+      [APP_ID, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const u = result.rows[0];
+    const now = new Date();
+
+    return res.json({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      isAdmin: u.is_admin || false,
+      holidayPassExpiresAt: u.holiday_pass_expires_at,
+      holidayPassActive: u.holiday_pass_expires_at ? new Date(u.holiday_pass_expires_at) >= now : false,
+      createdAt: u.created_at,
+      updatedAt: u.updated_at,
+      sessionCount: parseInt(u.session_count, 10) || 0,
+    });
+  } catch (err) {
+    console.error("Error in GET /api/admin/users/:userId:", err);
+    return res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+
+// Update user (admin, pass expiry, name)
+app.patch("/api/admin/users/:userId", requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { name, isAdmin, holidayPassExpiresAt } = req.body;
+
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramIndex++}`);
+      values.push(name);
+    }
+    if (isAdmin !== undefined) {
+      updates.push(`is_admin = $${paramIndex++}`);
+      values.push(isAdmin);
+    }
+    if (holidayPassExpiresAt !== undefined) {
+      updates.push(`holiday_pass_expires_at = $${paramIndex++}`);
+      values.push(holidayPassExpiresAt ? new Date(holidayPassExpiresAt).toISOString() : null);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "No fields to update" });
+    }
+
+    updates.push(`updated_at = now()`);
+    values.push(userId, APP_ID);
+
+    const result = await db.query(
+      `UPDATE users SET ${updates.join(", ")}
+       WHERE id = $${paramIndex++} AND app_id = $${paramIndex}
+       RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const u = result.rows[0];
+    const now = new Date();
+
+    return res.json({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      isAdmin: u.is_admin || false,
+      holidayPassExpiresAt: u.holiday_pass_expires_at,
+      holidayPassActive: u.holiday_pass_expires_at ? new Date(u.holiday_pass_expires_at) >= now : false,
+    });
+  } catch (err) {
+    console.error("Error in PATCH /api/admin/users/:userId:", err);
+    return res.status(500).json({ error: "Failed to update user" });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Admin API: Analytics
+// ---------------------------------------------------------------------
+
+// Analytics overview
+app.get("/api/admin/analytics/overview", requireAdmin, async (req, res) => {
+  try {
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Get user counts
+    const userResult = await db.query(
+      `SELECT
+        COUNT(*) AS total_users,
+        COUNT(CASE WHEN holiday_pass_expires_at >= $2 THEN 1 END) AS active_pass_users
+      FROM users
+      WHERE app_id = $1`,
+      [APP_ID, now.toISOString()]
+    );
+
+    // Get session counts and averages
+    const sessionResult = await db.query(
+      `SELECT
+        COUNT(*) AS total_sessions,
+        COUNT(DISTINCT thread_id) AS total_threads,
+        COUNT(CASE WHEN created_at >= $2 THEN 1 END) AS sessions_this_week,
+        COUNT(CASE WHEN created_at >= $3 THEN 1 END) AS sessions_this_month
+      FROM sessions
+      WHERE app_id = $1`,
+      [APP_ID, weekAgo.toISOString(), monthAgo.toISOString()]
+    );
+
+    // Get average turns per thread
+    const avgResult = await db.query(
+      `SELECT AVG(turn_count) AS avg_turns
+      FROM (
+        SELECT thread_id, COUNT(*) AS turn_count
+        FROM sessions
+        WHERE app_id = $1
+        GROUP BY thread_id
+      ) t`,
+      [APP_ID]
+    );
+
+    return res.json({
+      totalUsers: parseInt(userResult.rows[0].total_users, 10) || 0,
+      activePassUsers: parseInt(userResult.rows[0].active_pass_users, 10) || 0,
+      totalSessions: parseInt(sessionResult.rows[0].total_sessions, 10) || 0,
+      totalThreads: parseInt(sessionResult.rows[0].total_threads, 10) || 0,
+      sessionsThisWeek: parseInt(sessionResult.rows[0].sessions_this_week, 10) || 0,
+      sessionsThisMonth: parseInt(sessionResult.rows[0].sessions_this_month, 10) || 0,
+      avgTurnsPerThread: parseFloat(avgResult.rows[0].avg_turns) || 0,
+    });
+  } catch (err) {
+    console.error("Error in GET /api/admin/analytics/overview:", err);
+    return res.status(500).json({ error: "Failed to fetch analytics" });
+  }
+});
+
+// Activity trends
+app.get("/api/admin/analytics/trends", requireAdmin, async (req, res) => {
+  try {
+    const days = Math.min(90, Math.max(7, parseInt(req.query.days, 10) || 14));
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const result = await db.query(
+      `SELECT
+        DATE(created_at) AS date,
+        COUNT(*) AS sessions,
+        COUNT(DISTINCT user_id) AS unique_users
+      FROM sessions
+      WHERE app_id = $1 AND created_at >= $2
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC`,
+      [APP_ID, startDate.toISOString()]
+    );
+
+    return res.json({
+      period: `${days} days`,
+      data: result.rows.map((r) => ({
+        date: r.date,
+        sessions: parseInt(r.sessions, 10) || 0,
+        uniqueUsers: parseInt(r.unique_users, 10) || 0,
+      })),
+    });
+  } catch (err) {
+    console.error("Error in GET /api/admin/analytics/trends:", err);
+    return res.status(500).json({ error: "Failed to fetch trends" });
+  }
+});
+
+// Top users by session count
+app.get("/api/admin/analytics/top-users", requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(20, Math.max(1, parseInt(req.query.limit, 10) || 10));
+
+    const result = await db.query(
+      `SELECT
+        u.id,
+        u.email,
+        COUNT(DISTINCT s.thread_id) AS session_count,
+        MAX(s.created_at) AS last_session_at
+      FROM users u
+      JOIN sessions s ON s.user_id = u.id AND s.app_id = $1
+      WHERE u.app_id = $1
+      GROUP BY u.id
+      ORDER BY session_count DESC
+      LIMIT $2`,
+      [APP_ID, limit]
+    );
+
+    return res.json({
+      users: result.rows.map((u) => ({
+        id: u.id,
+        email: u.email,
+        sessionCount: parseInt(u.session_count, 10) || 0,
+        lastSessionAt: u.last_session_at,
+      })),
+    });
+  } catch (err) {
+    console.error("Error in GET /api/admin/analytics/top-users:", err);
+    return res.status(500).json({ error: "Failed to fetch top users" });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Admin API: Sessions
+// ---------------------------------------------------------------------
+
+// List recent sessions (admin view with user info)
+app.get("/api/admin/sessions", requireAdmin, async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+
+    // Get total count
+    const countResult = await db.query(
+      `SELECT COUNT(DISTINCT thread_id) FROM sessions WHERE app_id = $1`,
+      [APP_ID]
+    );
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    // Get session threads with user info
+    const result = await db.query(
+      `WITH thread_summary AS (
+        SELECT
+          s.thread_id,
+          s.user_id,
+          MIN(s.created_at) AS started_at,
+          MAX(s.created_at) AS last_updated_at,
+          COUNT(*) AS turn_count,
+          MIN(CASE WHEN s.turn_index = 0 OR s.turn_index IS NULL THEN s.input_prompt END) AS first_message
+        FROM sessions s
+        WHERE s.app_id = $1
+        GROUP BY s.thread_id, s.user_id
+      )
+      SELECT
+        t.thread_id,
+        t.started_at,
+        t.last_updated_at,
+        t.turn_count,
+        t.first_message,
+        u.email AS user_email
+      FROM thread_summary t
+      LEFT JOIN users u ON u.id = t.user_id
+      ORDER BY t.last_updated_at DESC
+      LIMIT $2 OFFSET $3`,
+      [APP_ID, limit, offset]
+    );
+
+    return res.json({
+      sessions: result.rows.map((s) => ({
+        threadId: s.thread_id,
+        userEmail: s.user_email,
+        startedAt: s.started_at,
+        lastUpdatedAt: s.last_updated_at,
+        turnCount: parseInt(s.turn_count, 10) || 0,
+        firstMessage: s.first_message,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error("Error in GET /api/admin/sessions:", err);
+    return res.status(500).json({ error: "Failed to fetch sessions" });
+  }
+});
+
+// Get session detail (admin view)
+app.get("/api/admin/sessions/:threadId", requireAdmin, async (req, res) => {
+  try {
+    const { threadId } = req.params;
+
+    const result = await db.query(
+      `SELECT
+        s.id,
+        s.thread_id,
+        s.input_prompt,
+        s.cleaned_output,
+        s.created_at,
+        s.turn_index,
+        u.email AS user_email
+      FROM sessions s
+      LEFT JOIN users u ON u.id = s.user_id
+      WHERE s.app_id = $1 AND s.thread_id = $2
+      ORDER BY s.turn_index ASC, s.created_at ASC`,
+      [APP_ID, threadId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    return res.json({
+      threadId,
+      userEmail: result.rows[0].user_email,
+      messages: result.rows.map((m) => ({
+        id: m.id,
+        inputPrompt: m.input_prompt,
+        cleanedOutput: m.cleaned_output,
+        createdAt: m.created_at,
+        turnIndex: m.turn_index,
+      })),
+    });
+  } catch (err) {
+    console.error("Error in GET /api/admin/sessions/:threadId:", err);
+    return res.status(500).json({ error: "Failed to fetch session" });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Admin API: Offers (mirrors existing routes with admin auth)
+// ---------------------------------------------------------------------
+
+app.get("/api/admin/offers", requireAdmin, async (req, res) => {
+  try {
+    const offers = await getOffersForApp(APP_ID, { activeOnly: false });
+    return res.json({ offers });
+  } catch (err) {
+    console.error("Error fetching admin offers:", err);
+    return res.status(500).json({ error: "Failed to fetch offers" });
+  }
+});
+
+app.post("/api/admin/offers", requireAdmin, async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      url,
+      offerType = "general",
+      triggerKeywords = [],
+      aiMentionText,
+      displayOrder = 0,
+      showInline = true,
+      showAtWrapup = true,
+      showAsCard = true,
+      ctaText = "Learn More",
+    } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ error: "Title is required" });
+    }
+
+    const result = await db.query(
+      `INSERT INTO offers (
+        app_id, title, description, url, offer_type,
+        trigger_keywords, ai_mention_text, display_order,
+        show_inline, show_at_wrapup, show_as_card, cta_text
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      RETURNING *`,
+      [
+        APP_ID,
+        title,
+        description,
+        url,
+        offerType,
+        triggerKeywords,
+        aiMentionText,
+        displayOrder,
+        showInline,
+        showAtWrapup,
+        showAsCard,
+        ctaText,
+      ]
+    );
+
+    return res.json({ offer: result.rows[0] });
+  } catch (err) {
+    console.error("Error creating admin offer:", err);
+    return res.status(500).json({ error: "Failed to create offer" });
+  }
+});
+
+app.put("/api/admin/offers/:offerId", requireAdmin, async (req, res) => {
+  try {
+    const { offerId } = req.params;
+    const {
+      title,
+      description,
+      url,
+      offerType,
+      triggerKeywords,
+      aiMentionText,
+      displayOrder,
+      isActive,
+      showInline,
+      showAtWrapup,
+      showAsCard,
+      ctaText,
+    } = req.body;
+
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (title !== undefined) {
+      updates.push(`title = $${paramIndex++}`);
+      values.push(title);
+    }
+    if (description !== undefined) {
+      updates.push(`description = $${paramIndex++}`);
+      values.push(description);
+    }
+    if (url !== undefined) {
+      updates.push(`url = $${paramIndex++}`);
+      values.push(url);
+    }
+    if (offerType !== undefined) {
+      updates.push(`offer_type = $${paramIndex++}`);
+      values.push(offerType);
+    }
+    if (triggerKeywords !== undefined) {
+      updates.push(`trigger_keywords = $${paramIndex++}`);
+      values.push(triggerKeywords);
+    }
+    if (aiMentionText !== undefined) {
+      updates.push(`ai_mention_text = $${paramIndex++}`);
+      values.push(aiMentionText);
+    }
+    if (displayOrder !== undefined) {
+      updates.push(`display_order = $${paramIndex++}`);
+      values.push(displayOrder);
+    }
+    if (isActive !== undefined) {
+      updates.push(`is_active = $${paramIndex++}`);
+      values.push(isActive);
+    }
+    if (showInline !== undefined) {
+      updates.push(`show_inline = $${paramIndex++}`);
+      values.push(showInline);
+    }
+    if (showAtWrapup !== undefined) {
+      updates.push(`show_at_wrapup = $${paramIndex++}`);
+      values.push(showAtWrapup);
+    }
+    if (showAsCard !== undefined) {
+      updates.push(`show_as_card = $${paramIndex++}`);
+      values.push(showAsCard);
+    }
+    if (ctaText !== undefined) {
+      updates.push(`cta_text = $${paramIndex++}`);
+      values.push(ctaText);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "No fields to update" });
+    }
+
+    values.push(offerId, APP_ID);
+
+    const result = await db.query(
+      `UPDATE offers SET ${updates.join(", ")}
+       WHERE id = $${paramIndex++} AND app_id = $${paramIndex}
+       RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Offer not found" });
+    }
+
+    return res.json({ offer: result.rows[0] });
+  } catch (err) {
+    console.error("Error updating admin offer:", err);
+    return res.status(500).json({ error: "Failed to update offer" });
+  }
+});
+
+app.delete("/api/admin/offers/:offerId", requireAdmin, async (req, res) => {
+  try {
+    const { offerId } = req.params;
+
+    const result = await db.query(
+      `DELETE FROM offers WHERE id = $1 AND app_id = $2 RETURNING id`,
+      [offerId, APP_ID]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Offer not found" });
+    }
+
+    return res.json({ deleted: true });
+  } catch (err) {
+    console.error("Error deleting admin offer:", err);
+    return res.status(500).json({ error: "Failed to delete offer" });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Admin API: App Settings
+// ---------------------------------------------------------------------
+
+app.get("/api/admin/app", requireAdmin, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT id, slug, base_url, coach_name FROM apps WHERE id = $1`,
+      [APP_ID]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "App not found" });
+    }
+
+    const app = result.rows[0];
+
+    return res.json({
+      id: app.id,
+      slug: app.slug,
+      baseUrl: app.base_url,
+      coachName: app.coach_name,
+      systemPrompt: PROMPTS_CONFIG.systemPrompt || "No system prompt configured",
+    });
+  } catch (err) {
+    console.error("Error in GET /api/admin/app:", err);
+    return res.status(500).json({ error: "Failed to fetch app settings" });
+  }
+});
+
+app.patch("/api/admin/app", requireAdmin, async (req, res) => {
+  try {
+    const { coachName } = req.body;
+
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (coachName !== undefined) {
+      updates.push(`coach_name = $${paramIndex++}`);
+      values.push(coachName || null);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "No fields to update" });
+    }
+
+    values.push(APP_ID);
+
+    const result = await db.query(
+      `UPDATE apps SET ${updates.join(", ")}
+       WHERE id = $${paramIndex}
+       RETURNING id, slug, base_url, coach_name`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "App not found" });
+    }
+
+    const app = result.rows[0];
+
+    return res.json({
+      id: app.id,
+      slug: app.slug,
+      baseUrl: app.base_url,
+      coachName: app.coach_name,
+    });
+  } catch (err) {
+    console.error("Error in PATCH /api/admin/app:", err);
+    return res.status(500).json({ error: "Failed to update app settings" });
   }
 });
 
