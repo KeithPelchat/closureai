@@ -1679,6 +1679,28 @@ app.get("/api/admin/users", requireAdmin, async (req, res) => {
   }
 });
 
+// Get users for filter dropdown (lightweight list)
+// NOTE: Must be defined BEFORE /api/admin/users/:userId to avoid "list" being treated as userId
+app.get("/api/admin/users/list", requireAdmin, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT id, email, name FROM users WHERE app_id = $1 ORDER BY email ASC`,
+      [APP_ID]
+    );
+
+    return res.json({
+      users: result.rows.map((u) => ({
+        id: u.id,
+        email: u.email,
+        name: u.name,
+      })),
+    });
+  } catch (err) {
+    console.error("Error in GET /api/admin/users/list:", err);
+    return res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
 // Get single user details
 app.get("/api/admin/users/:userId", requireAdmin, async (req, res) => {
   try {
@@ -1908,17 +1930,40 @@ app.get("/api/admin/analytics/top-users", requireAdmin, async (req, res) => {
 // Admin API: Sessions
 // ---------------------------------------------------------------------
 
-// List recent sessions (admin view with user info)
 app.get("/api/admin/sessions", requireAdmin, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const offset = (page - 1) * limit;
 
-    // Get total count
+    // Filter parameters
+    const userId = req.query.userId || null;
+    const startDate = req.query.startDate || null;
+    const endDate = req.query.endDate || null;
+
+    // Build WHERE clause for filters
+    let whereClause = "s.app_id = $1";
+    const params = [APP_ID];
+
+    if (userId) {
+      params.push(userId);
+      whereClause += ` AND s.user_id = $${params.length}`;
+    }
+
+    if (startDate) {
+      params.push(startDate);
+      whereClause += ` AND s.created_at >= $${params.length}::date`;
+    }
+
+    if (endDate) {
+      params.push(endDate);
+      whereClause += ` AND s.created_at < ($${params.length}::date + interval '1 day')`;
+    }
+
+    // Get total count with filters
     const countResult = await db.query(
-      `SELECT COUNT(DISTINCT thread_id) FROM sessions WHERE app_id = $1`,
-      [APP_ID]
+      `SELECT COUNT(DISTINCT thread_id) FROM sessions s WHERE ${whereClause}`,
+      params
     );
     const total = parseInt(countResult.rows[0].count, 10);
 
@@ -1933,7 +1978,7 @@ app.get("/api/admin/sessions", requireAdmin, async (req, res) => {
           COUNT(*) AS turn_count,
           MIN(CASE WHEN s.turn_index = 0 OR s.turn_index IS NULL THEN s.input_prompt END) AS first_message
         FROM sessions s
-        WHERE s.app_id = $1
+        WHERE ${whereClause}
         GROUP BY s.thread_id, s.user_id
       )
       SELECT
@@ -1942,17 +1987,19 @@ app.get("/api/admin/sessions", requireAdmin, async (req, res) => {
         t.last_updated_at,
         t.turn_count,
         t.first_message,
-        u.email AS user_email
+        u.email AS user_email,
+        u.id AS user_id
       FROM thread_summary t
       LEFT JOIN users u ON u.id = t.user_id
       ORDER BY t.last_updated_at DESC
-      LIMIT $2 OFFSET $3`,
-      [APP_ID, limit, offset]
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset]
     );
 
     return res.json({
       sessions: result.rows.map((s) => ({
         threadId: s.thread_id,
+        userId: s.user_id,
         userEmail: s.user_email,
         startedAt: s.started_at,
         lastUpdatedAt: s.last_updated_at,
@@ -1964,6 +2011,11 @@ app.get("/api/admin/sessions", requireAdmin, async (req, res) => {
         limit,
         total,
         totalPages: Math.ceil(total / limit),
+      },
+      filters: {
+        userId,
+        startDate,
+        endDate,
       },
     });
   } catch (err) {

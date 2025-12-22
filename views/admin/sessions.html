@@ -103,10 +103,48 @@
           </div>
         </div>
 
+        <!-- Session Filters -->
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Session Filters</h2>
+            <button class="btn-admin btn-admin-secondary btn-admin-sm" onclick="clearFilters()" id="clear-filters-btn" style="display: none;">
+              Clear Filters
+            </button>
+          </div>
+          <div class="admin-card-body">
+            <div class="filter-row">
+              <div class="filter-group">
+                <label class="admin-form-label">User</label>
+                <select class="admin-form-select" id="filter-user">
+                  <option value="">All Users</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label class="admin-form-label">Start Date</label>
+                <input type="date" class="admin-form-input" id="filter-start-date" />
+              </div>
+              <div class="filter-group">
+                <label class="admin-form-label">End Date</label>
+                <input type="date" class="admin-form-input" id="filter-end-date" />
+              </div>
+              <div class="filter-group filter-actions">
+                <label class="admin-form-label">&nbsp;</label>
+                <button class="btn-admin btn-admin-primary" onclick="applyFilters()">
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+            <div id="active-filters" style="margin-top: 12px; display: none;">
+              <span style="font-size: 13px; color: #64748b;">Active filters: </span>
+              <span id="active-filters-text" style="font-size: 13px; color: #0ea5e9;"></span>
+            </div>
+          </div>
+        </div>
+
         <!-- Recent Sessions -->
         <div class="admin-card">
           <div class="admin-card-header">
-            <h2 class="admin-card-title">Recent Sessions</h2>
+            <h2 class="admin-card-title" id="sessions-title">Recent Sessions</h2>
           </div>
           <div class="admin-card-body admin-table-responsive" id="sessions-table">
             <div class="admin-loading">
@@ -140,6 +178,89 @@
   <script>
     let currentPage = 1;
     const limit = 20;
+    let currentFilters = {
+      userId: null,
+      startDate: null,
+      endDate: null
+    };
+    let usersMap = {};
+
+    // Load users for filter dropdown
+    async function loadUsersDropdown() {
+      try {
+        const data = await adminFetch("/api/admin/users/list");
+        const select = document.getElementById("filter-user");
+
+        if (data.users && data.users.length > 0) {
+          data.users.forEach(user => {
+            usersMap[user.id] = user.email;
+            const option = document.createElement("option");
+            option.value = user.id;
+            option.textContent = user.email;
+            select.appendChild(option);
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load users for dropdown:", err);
+      }
+    }
+
+    // Apply filters
+    function applyFilters() {
+      const userId = document.getElementById("filter-user").value || null;
+      const startDate = document.getElementById("filter-start-date").value || null;
+      const endDate = document.getElementById("filter-end-date").value || null;
+
+      currentFilters = { userId, startDate, endDate };
+      currentPage = 1;
+
+      updateFilterUI();
+      loadSessions(1);
+    }
+
+    // Clear filters
+    function clearFilters() {
+      document.getElementById("filter-user").value = "";
+      document.getElementById("filter-start-date").value = "";
+      document.getElementById("filter-end-date").value = "";
+
+      currentFilters = { userId: null, startDate: null, endDate: null };
+      currentPage = 1;
+
+      updateFilterUI();
+      loadSessions(1);
+    }
+
+    // Update filter UI state
+    function updateFilterUI() {
+      const hasFilters = currentFilters.userId || currentFilters.startDate || currentFilters.endDate;
+      const clearBtn = document.getElementById("clear-filters-btn");
+      const activeFiltersDiv = document.getElementById("active-filters");
+      const activeFiltersText = document.getElementById("active-filters-text");
+      const sessionsTitle = document.getElementById("sessions-title");
+
+      clearBtn.style.display = hasFilters ? "inline-flex" : "none";
+      activeFiltersDiv.style.display = hasFilters ? "block" : "none";
+
+      if (hasFilters) {
+        const parts = [];
+        if (currentFilters.userId) {
+          const userName = usersMap[currentFilters.userId] || "User " + currentFilters.userId;
+          parts.push(userName);
+        }
+        if (currentFilters.startDate && currentFilters.endDate) {
+          parts.push(`${currentFilters.startDate} to ${currentFilters.endDate}`);
+        } else if (currentFilters.startDate) {
+          parts.push(`from ${currentFilters.startDate}`);
+        } else if (currentFilters.endDate) {
+          parts.push(`until ${currentFilters.endDate}`);
+        }
+        activeFiltersText.textContent = parts.join(" · ");
+        sessionsTitle.textContent = "Filtered Sessions";
+      } else {
+        sessionsTitle.textContent = "Recent Sessions";
+      }
+    }
 
     // Load analytics overview
     async function loadStats() {
@@ -232,10 +353,27 @@
       showLoading(container);
 
       try {
-        const data = await adminFetch(`/api/admin/sessions?page=${page}&limit=${limit}`);
+        // Build URL with filter parameters
+        let url = `/api/admin/sessions?page=${page}&limit=${limit}`;
+        if (currentFilters.userId) {
+          url += `&userId=${encodeURIComponent(currentFilters.userId)}`;
+        }
+        if (currentFilters.startDate) {
+          url += `&startDate=${encodeURIComponent(currentFilters.startDate)}`;
+        }
+        if (currentFilters.endDate) {
+          url += `&endDate=${encodeURIComponent(currentFilters.endDate)}`;
+        }
+
+        const data = await adminFetch(url);
 
         if (!data.sessions || data.sessions.length === 0) {
-          showEmptyState(container, "No sessions yet", "Sessions will appear here once users start chatting.");
+          const hasFilters = currentFilters.userId || currentFilters.startDate || currentFilters.endDate;
+          if (hasFilters) {
+            showEmptyState(container, "No matching sessions", "No sessions match your current filters. Try adjusting your criteria.");
+          } else {
+            showEmptyState(container, "No sessions yet", "Sessions will appear here once users start chatting.");
+          }
           document.getElementById("pagination").innerHTML = "";
           return;
         }
@@ -320,6 +458,7 @@
     }
 
     // Initialize
+    loadUsersDropdown();
     loadStats();
     loadTrend();
     loadTopUsers();
