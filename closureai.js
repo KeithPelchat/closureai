@@ -70,7 +70,7 @@ app.use("/assets", express.static(path.join(__dirname, "assets")));
 // ---------------------------------------------------------------------
 app.get("/", (req, res) => {
   const filePath = path.join(__dirname, "public", "default.html");
-  renderHtmlTemplate(res, filePath);
+  renderHtmlTemplate(res, filePath, {}, req.tenant);
 });
 
 // ---------------------------------------------------------------------
@@ -86,11 +86,25 @@ const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || "";
 
 // ---------------------------------------------------------------------
 // CORS (safe for everything, including Stripe)
+// Allow any *.getclosureai.com subdomain for multi-tenant support
 // ---------------------------------------------------------------------
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || APP_CONFIG.allowedOrigins.includes(origin)) {
+      // No origin (same-origin requests, curl, etc.)
+      if (!origin) {
+        return callback(null, true);
+      }
+      // Explicit allowed origins from config
+      if (APP_CONFIG.allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      // Allow any *.getclosureai.com subdomain
+      if (origin.match(/^https?:\/\/([a-z0-9-]+\.)?getclosureai\.com$/)) {
+        return callback(null, true);
+      }
+      // Allow localhost for development
+      if (origin.match(/^https?:\/\/localhost(:\d+)?$/)) {
         return callback(null, true);
       }
       return callback(new Error("Not allowed by CORS: " + origin));
@@ -125,7 +139,31 @@ app.post(
         case "checkout.session.completed": {
           console.log("✅ Stripe: checkout.session.completed");
           const session = event.data.object;
-          await handlePaidUser(session); // grant pass + send secure link
+
+          // Check if this is a coach platform checkout
+          if (session.metadata?.product === "coach_platform") {
+            await handleCoachPlatformCheckout(session);
+          } else {
+            await handlePaidUser(session); // grant pass + send secure link
+          }
+          break;
+        }
+        case "customer.subscription.created": {
+          // Add setup fee to first invoice if this is a coach platform subscription
+          const subscription = event.data.object;
+          if (subscription.metadata?.product === "coach_platform" && subscription.metadata?.setup_fee_price_id) {
+            console.log("✅ Adding setup fee invoice item for coach platform subscription");
+            try {
+              await stripe.invoiceItems.create({
+                customer: subscription.customer,
+                price: subscription.metadata.setup_fee_price_id,
+                description: "One-time platform setup fee",
+              });
+              console.log("✅ Setup fee invoice item created");
+            } catch (invoiceErr) {
+              console.error("❌ Failed to add setup fee invoice item:", invoiceErr.message);
+            }
+          }
           break;
         }
         default:
@@ -145,6 +183,106 @@ app.post(
 // ---------------------------------------------------------------------
 app.use(express.json());
 app.use(cookieParser());
+
+// ---------------------------------------------------------------------
+// Multi-tenant resolution middleware
+// Detects subdomain/custom domain and loads coach config from DB
+// ---------------------------------------------------------------------
+const MAIN_DOMAINS = ["getclosureai.com", "www.getclosureai.com", "app.getclosureai.com", "localhost"];
+
+async function resolveTenant(req, res, next) {
+  try {
+    const hostname = req.hostname || req.get("host")?.split(":")[0] || "";
+
+    // Check if this is a main domain (use default ClosureAI app)
+    if (MAIN_DOMAINS.includes(hostname) || hostname.startsWith("localhost")) {
+      req.tenant = null; // Will use global APP_ID
+      return next();
+    }
+
+    // Extract subdomain from *.getclosureai.com
+    let lookupValue = null;
+    let lookupType = null;
+
+    if (hostname.endsWith(".getclosureai.com")) {
+      lookupValue = hostname.replace(".getclosureai.com", "");
+      lookupType = "subdomain";
+    } else {
+      // Assume it's a custom domain
+      lookupValue = hostname;
+      lookupType = "custom_domain";
+    }
+
+    // Look up the tenant app
+    const query = lookupType === "subdomain"
+      ? `SELECT id, slug, name, business_name, coach_name, coach_email,
+           coaching_niche, target_audience, coaching_style, coach_bio,
+           custom_system_prompt, logo_url, primary_color, secondary_color,
+           subdomain, custom_domain, status, is_active, auto_grant_access_days
+         FROM apps WHERE subdomain = $1 AND is_active = true`
+      : `SELECT id, slug, name, business_name, coach_name, coach_email,
+           coaching_niche, target_audience, coaching_style, coach_bio,
+           custom_system_prompt, logo_url, primary_color, secondary_color,
+           subdomain, custom_domain, status, is_active, auto_grant_access_days
+         FROM apps WHERE custom_domain = $1 AND is_active = true`;
+
+    const result = await db.query(query, [lookupValue]);
+
+    if (result.rows.length === 0) {
+      // No tenant found - could show error or redirect
+      console.log(`[Tenant] No active app found for ${lookupType}=${lookupValue}`);
+      return res.status(404).send("App not found or not active.");
+    }
+
+    req.tenant = result.rows[0];
+    console.log(`[Tenant] Resolved ${hostname} → ${req.tenant.business_name || req.tenant.slug}`);
+    next();
+  } catch (err) {
+    console.error("[Tenant] Resolution error:", err);
+    next(err);
+  }
+}
+
+// Apply tenant resolution to all requests
+app.use(resolveTenant);
+
+// ---------------------------------------------------------------------
+// Dynamic PWA manifest (per-tenant branding)
+// Must be before static middleware to take precedence
+// ---------------------------------------------------------------------
+app.get("/manifest.json", (req, res) => {
+  const tenant = req.tenant;
+
+  // Build tenant-specific manifest
+  const manifest = {
+    name: tenant?.business_name || APP_CONFIG.appName || "ClosureAI",
+    short_name: tenant?.business_name?.substring(0, 12) || APP_CONFIG.appName || "ClosureAI",
+    description: tenant
+      ? `Coaching sessions with ${tenant.coach_name || "your coach"}`
+      : "AI-guided reflection sessions",
+    start_url: "/",
+    display: "standalone",
+    background_color: "#ffffff",
+    theme_color: tenant?.primary_color || APP_CONFIG.themeColor || "#0d9488",
+    icons: [
+      {
+        src: tenant?.logo_url || "/icons/icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any maskable"
+      },
+      {
+        src: tenant?.logo_url || "/icons/icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any maskable"
+      }
+    ]
+  };
+
+  res.setHeader("Content-Type", "application/manifest+json");
+  res.json(manifest);
+});
 
 // Serve static assets (CSS/JS/images)
 app.use(express.static(path.join(__dirname, "public")));
@@ -192,18 +330,21 @@ function hasActiveHolidayPass(user) {
 // DB helpers
 // ---------------------------------------------------------------------
 
-async function findOrCreateUser({ email, name, ghlContactId }) {
+async function findOrCreateUser({ email, name, ghlContactId, appId = null, autoGrantDays = null }) {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail) {
     throw new Error("Email is required to findOrCreateUser");
   }
-  if (!APP_ID) {
-    throw new Error("APP_ID not initialized");
+
+  // Use provided appId or fall back to global APP_ID
+  const effectiveAppId = appId || APP_ID;
+  if (!effectiveAppId) {
+    throw new Error("APP_ID not initialized and no appId provided");
   }
 
   const existing = await db.query(
     "SELECT * FROM users WHERE app_id = $1 AND email = $2",
-    [APP_ID, normalizedEmail]
+    [effectiveAppId, normalizedEmail]
   );
 
   if (existing.rows.length > 0) {
@@ -225,12 +366,22 @@ async function findOrCreateUser({ email, name, ghlContactId }) {
     return user;
   }
 
+  // Calculate access expiry if auto-grant is set
+  let accessExpiry = null;
+  if (autoGrantDays && autoGrantDays > 0) {
+    accessExpiry = new Date(Date.now() + autoGrantDays * 24 * 60 * 60 * 1000);
+  }
+
   const result = await db.query(
-    `INSERT INTO users (email, name, ghl_contact_id, app_id)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO users (email, name, ghl_contact_id, app_id, holiday_pass_expires_at)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING *`,
-    [normalizedEmail, name, ghlContactId, APP_ID]
+    [normalizedEmail, name, ghlContactId, effectiveAppId, accessExpiry]
   );
+
+  if (accessExpiry) {
+    console.log(`[User] Auto-granted ${autoGrantDays} days access to ${normalizedEmail}`);
+  }
 
   return result.rows[0];
 }
@@ -298,12 +449,33 @@ async function getCoachNameForApp(appId) {
   return "your coach";
 }
 
+/**
+ * Get full app profile for building coach-specific prompts
+ */
+async function getAppProfile(appId) {
+  const result = await db.query(
+    `SELECT
+      id, slug, name, coach_name, business_name,
+      coaching_niche, target_audience, coaching_style, coach_bio,
+      custom_system_prompt
+    FROM apps WHERE id = $1`,
+    [appId]
+  );
+
+  if (result.rows.length > 0) {
+    return result.rows[0];
+  }
+
+  return null;
+}
+
 // ---------------------------------------------------------------------
 // Simple HTML templating helper for views / public shells
 // ---------------------------------------------------------------------
 
-function getTemplateTokens(extraTokens = {}) {
-  return {
+function getTemplateTokens(tenant = null, extraTokens = {}) {
+  // Default tokens from config
+  const defaults = {
     // Core app tokens (already used in default.html/login.html)
     APP_NAME: APP_CONFIG.appName,
     THEME_COLOR: APP_CONFIG.themeColor,
@@ -332,19 +504,45 @@ function getTemplateTokens(extraTokens = {}) {
     HOLIDAY_HEADLINE: UI_CONFIG.holidayPassPage.headline,
     HOLIDAY_SUBHEADLINE: UI_CONFIG.holidayPassPage.subheadline,
 
-    // Allow per-call overrides
+    // Tenant branding defaults (used in CSS variables)
+    PRIMARY_COLOR: "#0d9488",
+    SECONDARY_COLOR: "#14b8a6",
+    COACH_NAME: "your coach",
+    BUSINESS_NAME: APP_CONFIG.appName,
+  };
+
+  // Override with tenant-specific values if available
+  if (tenant) {
+    console.log(`[Template] Applying tenant overrides: logo_url=${tenant.logo_url}, primary_color=${tenant.primary_color}`);
+    defaults.APP_NAME = tenant.business_name || tenant.name || defaults.APP_NAME;
+    defaults.BUSINESS_NAME = tenant.business_name || tenant.name || defaults.BUSINESS_NAME;
+    defaults.COACH_NAME = tenant.coach_name || defaults.COACH_NAME;
+    defaults.PRIMARY_COLOR = tenant.primary_color || defaults.PRIMARY_COLOR;
+    defaults.SECONDARY_COLOR = tenant.secondary_color || defaults.SECONDARY_COLOR;
+    defaults.THEME_COLOR = tenant.primary_color || defaults.THEME_COLOR;
+    if (tenant.logo_url) {
+      defaults.APP_LOGO = tenant.logo_url;
+    }
+    // Update copy to use coach name
+    defaults.LOGIN_HEADLINE = `Welcome to ${tenant.business_name || "your coaching space"}`;
+    defaults.LOGIN_SUBHEADLINE = `Sign in to start your session with ${tenant.coach_name || "your coach"}`;
+    defaults.SESSION_INTRO = `I'm here to help you work through whatever's on your mind. What would you like to explore today?`;
+  }
+
+  return {
+    ...defaults,
     ...extraTokens,
   };
 }
 
-function renderHtmlTemplate(res, filePath, extraTokens = {}) {
+function renderHtmlTemplate(res, filePath, extraTokens = {}, tenant = null) {
   fs.readFile(filePath, "utf8", (err, html) => {
     if (err) {
       console.error("Error reading template:", filePath, err);
       return res.status(500).send("Error loading page.");
     }
 
-    const tokens = getTemplateTokens(extraTokens);
+    const tokens = getTemplateTokens(tenant, extraTokens);
 
     let rendered = html;
     for (const [key, value] of Object.entries(tokens)) {
@@ -593,6 +791,62 @@ async function handlePaidUser(session) {
   );
 }
 
+/**
+ * Handle a coach platform checkout completion
+ * Creates a new app record with pending_onboarding status
+ */
+async function handleCoachPlatformCheckout(session) {
+  const customerId = session.customer;
+  const subscriptionId = session.subscription;
+  const customerEmail = session.customer_details?.email || session.customer_email;
+
+  console.log(`[Coach Platform] Processing checkout for customer: ${customerId}`);
+
+  // Generate a unique onboarding token
+  const onboardingToken = crypto.randomBytes(32).toString("hex");
+  const onboardingTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+  // Generate a unique slug for the new app
+  const slug = `coach-${crypto.randomBytes(4).toString("hex")}`;
+
+  try {
+    // Create a new app record
+    // Generate placeholder base_url using the slug (will be updated during onboarding)
+    const baseUrl = `https://${slug}.getclosureai.com`;
+
+    const result = await db.query(
+      `INSERT INTO apps (
+        slug, name, base_url, coach_email, stripe_customer_id, stripe_subscription_id,
+        status, setup_paid_at, onboarding_token, onboarding_token_expires_at, subdomain
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9, $10)
+      RETURNING id, slug`,
+      [
+        slug,
+        "Pending Setup", // Placeholder name until onboarding completes
+        baseUrl,
+        customerEmail,
+        customerId,
+        subscriptionId,
+        "pending_onboarding",
+        onboardingToken,
+        onboardingTokenExpiresAt,
+        slug, // Use slug as subdomain initially
+      ]
+    );
+
+    console.log(`[Coach Platform] Created app ${result.rows[0].slug} with id ${result.rows[0].id}`);
+    console.log(`[Coach Platform] Onboarding token: ${onboardingToken}`);
+
+    // TODO: Send welcome email with onboarding link
+    // For now, the user will get redirected to /onboard/form?token=CHECKOUT_SESSION_ID
+    // which will look up the app by stripe customer ID
+
+  } catch (err) {
+    console.error("[Coach Platform] Error creating app:", err);
+    throw err;
+  }
+}
+
 // ---------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------
@@ -630,7 +884,7 @@ app.get("/demo", (req, res) => {
 // Login page → templated login.html
 app.get("/login", (req, res) => {
   const filePath = path.join(__dirname, "public", "login.html");
-  renderHtmlTemplate(res, filePath);
+  renderHtmlTemplate(res, filePath, {}, req.tenant);
 });
 
 // ---------------------------------------------------------------------
@@ -683,6 +937,8 @@ app.post("/auth/secure-link", async (req, res) => {
       email,
       name: name || null,
       ghlContactId: null,
+      appId: req.tenant?.id,
+      autoGrantDays: req.tenant?.auto_grant_access_days,
     });
 
     const loginUrl = await createMagicLink(user.id);
@@ -720,7 +976,13 @@ app.get("/auth/google", (req, res) => {
       .send("Google login is not configured. Please try email link instead.");
   }
 
-  const state = crypto.randomBytes(16).toString("hex");
+  // Encode the originating hostname in state so we can redirect back after auth
+  const hostname = req.hostname || req.get("host")?.split(":")[0] || "";
+  const stateData = {
+    nonce: crypto.randomBytes(16).toString("hex"),
+    returnHost: hostname,
+  };
+  const state = Buffer.from(JSON.stringify(stateData)).toString("base64url");
 
   const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   authUrl.searchParams.set("client_id", GOOGLE_CLIENT_ID);
@@ -732,13 +994,24 @@ app.get("/auth/google", (req, res) => {
   authUrl.searchParams.set("state", state);
   authUrl.searchParams.set("prompt", "select_account");
 
-  console.log("[Google OAuth] Redirecting to Google auth:", authUrl.toString());
+  console.log("[Google OAuth] Redirecting to Google auth, return host:", hostname);
   return res.redirect(authUrl.toString());
 });
 
 // Google OAuth callback
 app.get("/auth/google/callback", async (req, res) => {
-  const { code, error, error_description } = req.query;
+  const { code, error, error_description, state } = req.query;
+
+  // Decode state to get return host
+  let returnHost = null;
+  if (state) {
+    try {
+      const stateData = JSON.parse(Buffer.from(state, "base64url").toString("utf8"));
+      returnHost = stateData.returnHost;
+    } catch (e) {
+      console.warn("[Google OAuth] Could not decode state:", e.message);
+    }
+  }
 
   try {
     if (error) {
@@ -834,26 +1107,43 @@ app.get("/auth/google/callback", async (req, res) => {
       email,
       name,
       ghlContactId: null,
+      appId: req.tenant?.id,
+      autoGrantDays: req.tenant?.auto_grant_access_days,
     });
 
     const jwtToken = jwt.sign({ userId: user.id }, JWT_SECRET, {
       expiresIn: "30d",
     });
 
-    res.cookie("closureai_auth", jwtToken, {
+    // Set cookie with domain for cross-subdomain auth
+    const cookieOptions = {
       httpOnly: true,
       secure: true,
       sameSite: "lax",
       maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
+    };
+
+    // If returnHost is a subdomain of getclosureai.com, set cookie domain for sharing
+    if (returnHost && returnHost.endsWith(".getclosureai.com")) {
+      cookieOptions.domain = ".getclosureai.com";
+    }
+
+    res.cookie("closureai_auth", jwtToken, cookieOptions);
+
+    // Redirect back to the originating tenant subdomain
+    let redirectUrl = "/";
+    if (returnHost && returnHost !== "getclosureai.com" && returnHost.endsWith(".getclosureai.com")) {
+      redirectUrl = `https://${returnHost}/`;
+    }
 
     console.log(
       "[Google OAuth] Login complete for",
       email,
-      "→ redirecting to /"
+      "→ redirecting to",
+      redirectUrl
     );
 
-    return res.redirect("/");
+    return res.redirect(redirectUrl);
   } catch (err) {
     console.error("[Google OAuth] Unexpected error in callback:", err);
     return res
@@ -879,6 +1169,8 @@ app.post("/ghl/new-user", async (req, res) => {
       email,
       name: name || null,
       ghlContactId: contactId || null,
+      appId: req.tenant?.id,
+      autoGrantDays: req.tenant?.auto_grant_access_days,
     });
 
     const loginUrl = await createMagicLink(user.id);
@@ -926,12 +1218,20 @@ app.get("/login/:token", async (req, res) => {
       expiresIn: "30d",
     });
 
-    res.cookie("closureai_auth", jwtToken, {
+    // Set cookie with domain for cross-subdomain auth if on a subdomain
+    const hostname = req.hostname || req.get("host")?.split(":")[0] || "";
+    const cookieOptions = {
       httpOnly: true,
       secure: true,
       sameSite: "lax",
       maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
+    };
+
+    if (hostname.endsWith(".getclosureai.com")) {
+      cookieOptions.domain = ".getclosureai.com";
+    }
+
+    res.cookie("closureai_auth", jwtToken, cookieOptions);
 
     return res.redirect("/");
   } catch (err) {
@@ -985,19 +1285,19 @@ app.get("/cancelled", (req, res) => {
 // Dashboard (protected)
 app.get("/dashboard", requireAuth, (req, res) => {
   const filePath = path.join(__dirname, "views", "dashboard.html");
-  renderHtmlTemplate(res, filePath);
+  renderHtmlTemplate(res, filePath, {}, req.tenant);
 });
 
 // Session page (protected)
 app.get("/session", requireAuth, (req, res) => {
   const filePath = path.join(__dirname, "views", "session.html");
-  renderHtmlTemplate(res, filePath);
+  renderHtmlTemplate(res, filePath, {}, req.tenant);
 });
 
 // Holiday pass funnel
 app.get("/holiday-pass", (req, res) => {
   const filePath = path.join(__dirname, "views", "holiday-pass.html");
-  renderHtmlTemplate(res, filePath);
+  renderHtmlTemplate(res, filePath, {}, req.tenant);
 });
 
 // =========================
@@ -1042,6 +1342,7 @@ app.get("/api/me", requireAuth, async (req, res) => {
 app.get("/api/sessions", requireAuth, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
+    const effectiveAppId = req.tenant?.id || APP_ID;
 
     const result = await db.query(
       `
@@ -1080,7 +1381,7 @@ app.get("/api/sessions", requireAuth, async (req, res) => {
       ORDER BY last_updated_at DESC
       LIMIT $3
       `,
-      [req.user.id, APP_ID, limit]
+      [req.user.id, effectiveAppId, limit]
     );
 
 
@@ -1160,7 +1461,7 @@ function countAssistantTurns(history) {
   return (history || []).filter((m) => m.role === "assistant").length;
 }
 
-async function callOpenAIForClosure(conversationMessages, assistantTurnsParam, offers = [], coachName = "your coach") {
+async function callOpenAIForClosure(conversationMessages, assistantTurnsParam, offers = [], coachName = "your coach", appProfile = null) {
   const history = Array.isArray(conversationMessages)
     ? conversationMessages
     : [];
@@ -1172,9 +1473,14 @@ async function callOpenAIForClosure(conversationMessages, assistantTurnsParam, o
 
   const maxTurns = PROMPTS_CONFIG.maxAssistantTurns || 6;
 
-  // Use the new dynamic prompt builder
+  // Build coach-specific base prompt from app profile
+  const basePrompt = appProfile
+    ? PROMPTS_CONFIG.buildCoachBasePrompt(appProfile)
+    : PROMPTS_CONFIG.systemPrompt;
+
+  // Use the dynamic prompt builder with offer injection
   const systemPrompt = PROMPTS_CONFIG.buildSystemPrompt({
-    basePrompt: PROMPTS_CONFIG.systemPrompt,
+    basePrompt,
     assistantTurns,
     maxTurns,
     offers,
@@ -1228,19 +1534,23 @@ app.post("/api/ai/closure", requireAuth, async (req, res) => {
     ).length;
 
     // -----------------------------
-    // Fetch offers and coach name for this app
+    // Fetch app profile and offers for coach-specific prompts
+    // Use tenant from middleware if available, otherwise fall back to global APP_ID
     // -----------------------------
-    const offers = await getOffersForApp(APP_ID);
-    const coachName = await getCoachNameForApp(APP_ID);
+    const effectiveAppId = req.tenant?.id || APP_ID;
+    const appProfile = req.tenant || await getAppProfile(effectiveAppId);
+    const offers = await getOffersForApp(effectiveAppId);
+    const coachName = appProfile?.coach_name || "your coach";
 
     // -----------------------------
-    // Call OpenAI with offer context
+    // Call OpenAI with coach-specific prompt and offer context
     // -----------------------------
     const assistantReply = await callOpenAIForClosure(
       conversationMessages,
       assistantTurns,
       offers,
-      coachName
+      coachName,
+      appProfile
     );
 
     // If no threadId was provided, this is a brand-new thread
@@ -1279,7 +1589,7 @@ app.post("/api/ai/closure", requireAuth, async (req, res) => {
       [
         sessionId,
         req.user.id,
-        APP_ID,
+        effectiveAppId,
         effectiveThreadId,
         turnIndex,
         inputPrompt,
@@ -1581,27 +1891,27 @@ app.delete("/api/offers/:offerId", requireAuth, async (req, res) => {
 // Admin page routes
 app.get("/admin", requireAdmin, (req, res) => {
   const filePath = path.join(__dirname, "views", "admin", "dashboard.html");
-  renderHtmlTemplate(res, filePath);
+  renderHtmlTemplate(res, filePath, {}, req.tenant);
 });
 
 app.get("/admin/users", requireAdmin, (req, res) => {
   const filePath = path.join(__dirname, "views", "admin", "users.html");
-  renderHtmlTemplate(res, filePath);
+  renderHtmlTemplate(res, filePath, {}, req.tenant);
 });
 
 app.get("/admin/sessions", requireAdmin, (req, res) => {
   const filePath = path.join(__dirname, "views", "admin", "sessions.html");
-  renderHtmlTemplate(res, filePath);
+  renderHtmlTemplate(res, filePath, {}, req.tenant);
 });
 
 app.get("/admin/offers", requireAdmin, (req, res) => {
   const filePath = path.join(__dirname, "views", "admin", "offers.html");
-  renderHtmlTemplate(res, filePath);
+  renderHtmlTemplate(res, filePath, {}, req.tenant);
 });
 
 app.get("/admin/settings", requireAdmin, (req, res) => {
   const filePath = path.join(__dirname, "views", "admin", "settings.html");
-  renderHtmlTemplate(res, filePath);
+  renderHtmlTemplate(res, filePath, {}, req.tenant);
 });
 
 // ---------------------------------------------------------------------
@@ -2316,6 +2626,704 @@ app.patch("/api/admin/app", requireAdmin, async (req, res) => {
   } catch (err) {
     console.error("Error in PATCH /api/admin/app:", err);
     return res.status(500).json({ error: "Failed to update app settings" });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Onboarding Routes (Coach signup flow)
+// ---------------------------------------------------------------------
+
+// Platform admin emails (hardcoded for now)
+const PLATFORM_ADMINS = (process.env.PLATFORM_ADMIN_EMAILS || "keith@hypergen.ai").split(",").map(e => e.trim().toLowerCase());
+
+function requirePlatformAdmin(req, res, next) {
+  if (!req.user || !PLATFORM_ADMINS.includes(req.user.email.toLowerCase())) {
+    return res.status(403).json({ error: "Platform admin access required" });
+  }
+  next();
+}
+
+// Onboarding landing page
+app.get("/onboard", (req, res) => {
+  return res.sendFile(path.join(__dirname, "views/onboard/index.html"));
+});
+
+// Onboarding form (after payment)
+app.get("/onboard/form", (req, res) => {
+  return res.sendFile(path.join(__dirname, "views/onboard/form.html"));
+});
+
+// Onboarding success
+app.get("/onboard/success", (req, res) => {
+  return res.sendFile(path.join(__dirname, "views/onboard/success.html"));
+});
+
+// Create Stripe checkout session
+app.post("/api/onboard/create-checkout", async (req, res) => {
+  try {
+    const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
+    console.log("[STRIPE] Creating checkout with prices:", {
+      monthly: process.env.STRIPE_MONTHLY_PRICE_ID,
+      setup: process.env.STRIPE_SETUP_PRICE_ID,
+    });
+
+    // First, verify the price exists and get its details
+    let monthlyPrice;
+    try {
+      monthlyPrice = await stripe.prices.retrieve(process.env.STRIPE_MONTHLY_PRICE_ID);
+      console.log("[STRIPE] Monthly price details:", {
+        id: monthlyPrice.id,
+        type: monthlyPrice.type,
+        recurring: monthlyPrice.recurring,
+      });
+    } catch (priceErr) {
+      console.error("[STRIPE] Error fetching monthly price:", priceErr.message);
+      return res.status(500).json({ error: "Invalid monthly price configuration" });
+    }
+
+    // Build line items - subscription + one-time setup fee
+    const lineItems = [
+      {
+        price: process.env.STRIPE_MONTHLY_PRICE_ID,
+        quantity: 1,
+      },
+    ];
+
+    // Add one-time setup fee to line_items if configured
+    // Stripe Checkout allows mixing recurring + one-time prices in subscription mode
+    if (process.env.STRIPE_SETUP_PRICE_ID) {
+      lineItems.push({
+        price: process.env.STRIPE_SETUP_PRICE_ID,
+        quantity: 1,
+      });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      line_items: lineItems,
+      subscription_data: {
+        metadata: {
+          product: "coach_platform",
+        },
+      },
+      success_url: `${process.env.APP_BASE_URL || "https://app.getclosureai.com"}/onboard/form?token={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.APP_BASE_URL || "https://app.getclosureai.com"}/onboard?cancelled=true`,
+      metadata: {
+        product: "coach_platform",
+      },
+    });
+
+    console.log("[STRIPE] Checkout session created:", session.id);
+    return res.json({ url: session.url });
+  } catch (err) {
+    console.error("Error creating checkout session:", err.message);
+    return res.status(500).json({ error: "Failed to create checkout session: " + err.message });
+  }
+});
+
+// Get onboarding data
+app.get("/api/onboard/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    // Try to find by checkout session ID (Stripe) or onboarding token
+    let result = await db.query(
+      `SELECT * FROM apps WHERE onboarding_token = $1 OR stripe_customer_id = $1`,
+      [token]
+    );
+
+    // If not found by token, check if this is a Stripe session ID
+    if (!result.rows.length && token.startsWith("cs_")) {
+      const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+      console.log("[Onboard] Looking up checkout session:", token);
+
+      try {
+        const session = await stripe.checkout.sessions.retrieve(token);
+        console.log("[Onboard] Session customer:", session.customer);
+
+        if (session && session.customer) {
+          // Look up by stripe_customer_id (most reliable)
+          result = await db.query(
+            `SELECT * FROM apps WHERE stripe_customer_id = $1`,
+            [session.customer]
+          );
+          console.log("[Onboard] Found app by customer ID:", result.rows.length > 0);
+        }
+      } catch (stripeErr) {
+        console.error("[Onboard] Error retrieving Stripe session:", stripeErr.message);
+      }
+    }
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Invalid or expired onboarding link" });
+    }
+
+    const app = result.rows[0];
+
+    // Parse saved form data if any
+    let formData = {};
+    let offers = [];
+    try {
+      if (app.onboarding_data) {
+        const data = typeof app.onboarding_data === "string"
+          ? JSON.parse(app.onboarding_data)
+          : app.onboarding_data;
+        formData = data.formData || {};
+        offers = data.offers || [];
+      }
+    } catch (e) {}
+
+    return res.json({
+      email: app.coach_email,
+      formData,
+      offers,
+      logoUrl: app.logo_url,
+      status: app.status,
+    });
+  } catch (err) {
+    console.error("Error fetching onboarding data:", err);
+    return res.status(500).json({ error: "Failed to fetch onboarding data" });
+  }
+});
+
+// Save onboarding progress
+app.post("/api/onboard/:token/save", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { formData, offers, logoUrl } = req.body;
+
+    // Resolve the stripe_customer_id if token is a checkout session
+    let customerId = token;
+    if (token.startsWith("cs_")) {
+      try {
+        const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+        const session = await stripe.checkout.sessions.retrieve(token);
+        customerId = session.customer;
+      } catch (stripeErr) {
+        console.error("[Onboard Save] Error retrieving session:", stripeErr.message);
+      }
+    }
+
+    await db.query(
+      `UPDATE apps SET
+        onboarding_data = $2,
+        logo_url = COALESCE($3, logo_url),
+        business_name = COALESCE($4, business_name),
+        coach_name = COALESCE($5, coach_name),
+        subdomain = COALESCE($6, subdomain),
+        custom_domain = COALESCE($7, custom_domain),
+        primary_color = COALESCE($8, primary_color),
+        secondary_color = COALESCE($9, secondary_color)
+      WHERE onboarding_token = $1 OR stripe_customer_id = $1`,
+      [
+        customerId,
+        JSON.stringify({ formData, offers }),
+        logoUrl,
+        formData?.business_name,
+        formData?.coach_name,
+        formData?.subdomain,
+        formData?.custom_domain,
+        formData?.primary_color,
+        formData?.secondary_color,
+      ]
+    );
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("Error saving onboarding progress:", err);
+    return res.status(500).json({ error: "Failed to save progress" });
+  }
+});
+
+// Logo upload presigned URL
+app.post("/api/onboard/:token/upload-logo", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { filename, contentType } = req.body;
+
+    // Verify token
+    const appResult = await db.query(
+      `SELECT id FROM apps WHERE onboarding_token = $1 OR stripe_customer_id = $1`,
+      [token]
+    );
+    if (!appResult.rows.length) {
+      return res.status(404).json({ error: "Invalid token" });
+    }
+
+    const appId = appResult.rows[0].id;
+    const ext = filename.split(".").pop();
+    const key = `logos/${appId}_${Date.now()}.${ext}`;
+
+    const AWS = require("aws-sdk");
+    const s3 = new AWS.S3({ region: process.env.AWS_REGION || "us-east-2" });
+
+    const uploadUrl = s3.getSignedUrl("putObject", {
+      Bucket: process.env.S3_BUCKET || "closureai-assets",
+      Key: key,
+      ContentType: contentType,
+      Expires: 300,
+    });
+
+    const fileUrl = `https://${process.env.S3_BUCKET || "closureai-assets"}.s3.amazonaws.com/${key}`;
+
+    return res.json({ uploadUrl, fileUrl });
+  } catch (err) {
+    console.error("Error generating upload URL:", err);
+    return res.status(500).json({ error: "Failed to generate upload URL" });
+  }
+});
+
+// Submit onboarding
+app.post("/api/onboard/:token/submit", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { formData, offers, logoUrl } = req.body;
+
+    console.log("[Onboard Submit] Processing token:", token);
+
+    // Resolve the stripe_customer_id if token is a checkout session
+    let customerId = token;
+    if (token.startsWith("cs_")) {
+      try {
+        const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+        const session = await stripe.checkout.sessions.retrieve(token);
+        customerId = session.customer;
+        console.log("[Onboard Submit] Resolved customer ID:", customerId);
+      } catch (stripeErr) {
+        console.error("[Onboard Submit] Error retrieving session:", stripeErr.message);
+      }
+    }
+
+    // Update app with all data and change status
+    const result = await db.query(
+      `UPDATE apps SET
+        status = 'pending_review',
+        onboarding_data = $2,
+        onboarding_completed_at = NOW(),
+        logo_url = COALESCE($3, logo_url),
+        business_name = $4,
+        coach_name = $5,
+        coach_phone = $6,
+        coaching_niche = $7,
+        target_audience = $8,
+        coaching_style = $9,
+        coach_bio = $10,
+        subdomain = $11,
+        custom_domain = $12,
+        primary_color = COALESCE($13, primary_color),
+        secondary_color = COALESCE($14, secondary_color)
+      WHERE onboarding_token = $1 OR stripe_customer_id = $1
+      RETURNING *`,
+      [
+        customerId,
+        JSON.stringify({ formData, offers }),
+        logoUrl,
+        formData?.business_name,
+        formData?.coach_name,
+        formData?.coach_phone,
+        formData?.coaching_niche,
+        formData?.target_audience,
+        formData?.coaching_style,
+        formData?.coach_bio,
+        formData?.subdomain,
+        formData?.custom_domain,
+        formData?.primary_color,
+        formData?.secondary_color,
+      ]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Invalid token" });
+    }
+
+    const app = result.rows[0];
+
+    // Create offers if provided
+    if (offers && offers.length) {
+      for (const offer of offers) {
+        if (offer.title) {
+          await db.query(
+            `INSERT INTO offers (app_id, title, description, url, cta_text, is_active)
+             VALUES ($1, $2, $3, $4, $5, true)`,
+            [app.id, offer.title, offer.description, offer.url, offer.cta_text || "Learn More"]
+          );
+        }
+      }
+    }
+
+    // TODO: Send notification email to platform admin
+    console.log(`[ONBOARDING] New coach submitted: ${app.coach_email} (${app.business_name})`);
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("Error submitting onboarding:", err);
+    return res.status(500).json({ error: "Failed to submit onboarding" });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Platform Admin Routes
+// ---------------------------------------------------------------------
+
+// Platform admin pages
+app.get("/platform", requireAuth, requirePlatformAdmin, (req, res) => {
+  return res.sendFile(path.join(__dirname, "views/platform/dashboard.html"));
+});
+
+app.get("/platform/pending", requireAuth, requirePlatformAdmin, (req, res) => {
+  return res.sendFile(path.join(__dirname, "views/platform/pending.html"));
+});
+
+app.get("/platform/coaches", requireAuth, requirePlatformAdmin, (req, res) => {
+  return res.sendFile(path.join(__dirname, "views/platform/coaches.html"));
+});
+
+app.get("/platform/coach/:id", requireAuth, requirePlatformAdmin, (req, res) => {
+  return res.sendFile(path.join(__dirname, "views/platform/coach-detail.html"));
+});
+
+// Platform admin API
+app.get("/api/platform/stats", requireAuth, requirePlatformAdmin, async (req, res) => {
+  try {
+    const stats = await db.query(`
+      SELECT
+        (SELECT COUNT(*) FROM apps WHERE status = 'pending_review') AS pending_count,
+        (SELECT COUNT(*) FROM apps WHERE status = 'active') AS active_count,
+        (SELECT COUNT(*) FROM apps WHERE status IN ('pending_onboarding', 'pending_review', 'active')) AS total_coaches
+    `);
+
+    return res.json(stats.rows[0]);
+  } catch (err) {
+    console.error("Error fetching platform stats:", err);
+    return res.status(500).json({ error: "Failed to fetch stats" });
+  }
+});
+
+app.get("/api/platform/coaches", requireAuth, requirePlatformAdmin, async (req, res) => {
+  try {
+    const { status } = req.query;
+
+    let query = `SELECT * FROM apps WHERE status != 'pending_payment'`;
+    const params = [];
+
+    if (status) {
+      params.push(status);
+      query += ` AND status = $${params.length}`;
+    }
+
+    query += ` ORDER BY created_at DESC`;
+
+    const result = await db.query(query, params);
+
+    return res.json({
+      coaches: result.rows.map(app => ({
+        id: app.id,
+        businessName: app.business_name,
+        coachName: app.coach_name,
+        coachEmail: app.coach_email,
+        status: app.status,
+        subdomain: app.subdomain,
+        customDomain: app.custom_domain,
+        createdAt: app.created_at,
+        approvedAt: app.approved_at,
+      })),
+    });
+  } catch (err) {
+    console.error("Error fetching coaches:", err);
+    return res.status(500).json({ error: "Failed to fetch coaches" });
+  }
+});
+
+app.get("/api/platform/coaches/:id", requireAuth, requirePlatformAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(`SELECT * FROM apps WHERE id = $1`, [id]);
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Coach not found" });
+    }
+
+    const app = result.rows[0];
+
+    // Get offers
+    const offersResult = await db.query(
+      `SELECT * FROM offers WHERE app_id = $1 ORDER BY display_order`,
+      [id]
+    );
+
+    // Parse onboarding data
+    let onboardingData = {};
+    try {
+      if (app.onboarding_data) {
+        onboardingData = typeof app.onboarding_data === "string"
+          ? JSON.parse(app.onboarding_data)
+          : app.onboarding_data;
+      }
+    } catch (e) {}
+
+    return res.json({
+      id: app.id,
+      businessName: app.business_name,
+      coachName: app.coach_name,
+      coachEmail: app.coach_email,
+      coachPhone: app.coach_phone,
+      status: app.status,
+      subdomain: app.subdomain,
+      customDomain: app.custom_domain,
+      logoUrl: app.logo_url,
+      primaryColor: app.primary_color,
+      secondaryColor: app.secondary_color,
+      coachingNiche: app.coaching_niche,
+      targetAudience: app.target_audience,
+      coachingStyle: app.coaching_style,
+      coachBio: app.coach_bio,
+      customSystemPrompt: app.custom_system_prompt,
+      onboardingData,
+      offers: offersResult.rows,
+      createdAt: app.created_at,
+      setupPaidAt: app.setup_paid_at,
+      approvedAt: app.approved_at,
+      suspendedAt: app.suspended_at,
+    });
+  } catch (err) {
+    console.error("Error fetching coach:", err);
+    return res.status(500).json({ error: "Failed to fetch coach" });
+  }
+});
+
+// Update coach data
+app.patch("/api/platform/coaches/:id", requireAuth, requirePlatformAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      status,
+      business_name,
+      coach_name,
+      coach_email,
+      coach_phone,
+      coaching_niche,
+      target_audience,
+      coaching_style,
+      coach_bio,
+      subdomain,
+      custom_domain,
+      primary_color,
+      secondary_color,
+      logo_url,
+      custom_system_prompt,
+    } = req.body;
+
+    // Build dynamic update based on status change
+    let statusFields = '';
+    if (status === 'active') {
+      statusFields = ', is_active = true, approved_at = COALESCE(approved_at, NOW())';
+    } else if (status === 'suspended') {
+      statusFields = ', is_active = false, suspended_at = NOW()';
+    } else if (status === 'cancelled') {
+      statusFields = ', is_active = false';
+    }
+
+    const result = await db.query(
+      `UPDATE apps SET
+        status = COALESCE($2, status),
+        business_name = COALESCE($3, business_name),
+        coach_name = COALESCE($4, coach_name),
+        coach_email = COALESCE($5, coach_email),
+        coach_phone = COALESCE($6, coach_phone),
+        coaching_niche = COALESCE($7, coaching_niche),
+        target_audience = COALESCE($8, target_audience),
+        coaching_style = COALESCE($9, coaching_style),
+        coach_bio = COALESCE($10, coach_bio),
+        subdomain = COALESCE($11, subdomain),
+        custom_domain = COALESCE(NULLIF($12, ''), custom_domain),
+        primary_color = COALESCE($13, primary_color),
+        secondary_color = COALESCE($14, secondary_color),
+        logo_url = COALESCE(NULLIF($15, ''), logo_url),
+        custom_system_prompt = $16,
+        is_active = CASE WHEN $2 = 'active' THEN true WHEN $2 IN ('suspended', 'cancelled') THEN false ELSE is_active END,
+        approved_at = CASE WHEN $2 = 'active' AND approved_at IS NULL THEN NOW() ELSE approved_at END,
+        suspended_at = CASE WHEN $2 = 'suspended' THEN NOW() ELSE suspended_at END
+      WHERE id = $1
+      RETURNING *`,
+      [
+        id,
+        status || null,
+        business_name || null,
+        coach_name || null,
+        coach_email || null,
+        coach_phone || null,
+        coaching_niche || null,
+        target_audience || null,
+        coaching_style || null,
+        coach_bio || null,
+        subdomain || null,
+        custom_domain || '',
+        primary_color || null,
+        secondary_color || null,
+        logo_url || '',
+        custom_system_prompt || null,
+      ]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Coach not found" });
+    }
+
+    console.log(`[Platform] Updated coach ${id}`);
+    return res.json({ ok: true, coach: result.rows[0] });
+  } catch (err) {
+    console.error("Error updating coach:", err);
+    return res.status(500).json({ error: "Failed to update coach" });
+  }
+});
+
+app.post("/api/platform/coaches/:id/approve", requireAuth, requirePlatformAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Update status to active
+    const result = await db.query(
+      `UPDATE apps SET
+        status = 'active',
+        is_active = true,
+        approved_at = NOW()
+      WHERE id = $1
+      RETURNING *`,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Coach not found" });
+    }
+
+    const app = result.rows[0];
+
+    // Create admin user for coach if not exists
+    const existingUser = await db.query(
+      `SELECT id FROM users WHERE app_id = $1 AND email = $2`,
+      [id, app.coach_email]
+    );
+
+    if (!existingUser.rows.length) {
+      await db.query(
+        `INSERT INTO users (app_id, email, name, is_admin, created_at)
+         VALUES ($1, $2, $3, true, NOW())`,
+        [id, app.coach_email, app.coach_name]
+      );
+    } else {
+      await db.query(
+        `UPDATE users SET is_admin = true WHERE app_id = $1 AND email = $2`,
+        [id, app.coach_email]
+      );
+    }
+
+    // TODO: Send welcome email to coach
+    console.log(`[PLATFORM] Approved coach: ${app.coach_email} (${app.business_name})`);
+
+    return res.json({ ok: true, app: result.rows[0] });
+  } catch (err) {
+    console.error("Error approving coach:", err);
+    return res.status(500).json({ error: "Failed to approve coach" });
+  }
+});
+
+app.post("/api/platform/coaches/:id/suspend", requireAuth, requirePlatformAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      `UPDATE apps SET
+        status = 'suspended',
+        is_active = false,
+        suspended_at = NOW()
+      WHERE id = $1
+      RETURNING *`,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Coach not found" });
+    }
+
+    console.log(`[PLATFORM] Suspended coach: ${result.rows[0].coach_email}`);
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("Error suspending coach:", err);
+    return res.status(500).json({ error: "Failed to suspend coach" });
+  }
+});
+
+app.post("/api/platform/coaches/:id/reactivate", requireAuth, requirePlatformAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      `UPDATE apps SET
+        status = 'active',
+        is_active = true,
+        suspended_at = NULL
+      WHERE id = $1
+      RETURNING *`,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Coach not found" });
+    }
+
+    console.log(`[PLATFORM] Reactivated coach: ${result.rows[0].coach_email}`);
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("Error reactivating coach:", err);
+    return res.status(500).json({ error: "Failed to reactivate coach" });
+  }
+});
+
+app.patch("/api/platform/coaches/:id", requireAuth, requirePlatformAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    // Build dynamic update query
+    const allowedFields = [
+      "business_name", "coach_name", "coach_email", "coach_phone",
+      "subdomain", "custom_domain", "logo_url", "primary_color", "secondary_color",
+      "coaching_niche", "target_audience", "coaching_style", "coach_bio",
+      "custom_system_prompt"
+    ];
+
+    const setClauses = [];
+    const values = [id];
+
+    for (const [key, value] of Object.entries(updates)) {
+      const snakeKey = key.replace(/[A-Z]/g, m => "_" + m.toLowerCase());
+      if (allowedFields.includes(snakeKey)) {
+        values.push(value);
+        setClauses.push(`${snakeKey} = $${values.length}`);
+      }
+    }
+
+    if (setClauses.length === 0) {
+      return res.status(400).json({ error: "No valid fields to update" });
+    }
+
+    const result = await db.query(
+      `UPDATE apps SET ${setClauses.join(", ")} WHERE id = $1 RETURNING *`,
+      values
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Coach not found" });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("Error updating coach:", err);
+    return res.status(500).json({ error: "Failed to update coach" });
   }
 });
 

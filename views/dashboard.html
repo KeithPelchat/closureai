@@ -2,11 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>ClosureAI – Holiday Sanity Pass</title>
+    <title>{{APP_NAME}} – Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="{{PRIMARY_COLOR}}" />
     <link rel="stylesheet" href="/styles.css" />
 
     <style>
+      /* Tenant theming via CSS variables */
+      :root {
+        --primary-color: {{PRIMARY_COLOR}};
+        --secondary-color: {{SECONDARY_COLOR}};
+      }
       /* --------- Global layout & typography polish --------- */
 
       body {
@@ -230,10 +236,17 @@
       <header class="app-header">
         <div class="app-header-inner">
           <div class="brand">
-            <div class="brand-mark"></div>
+            <img
+              src="{{APP_LOGO}}"
+              alt="{{APP_NAME}}"
+              class="brand-logo"
+              style="height: 36px; width: auto; border-radius: 6px;"
+              onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+            />
+            <div class="brand-mark" style="background: var(--primary-color, #0d9488); display: none;"></div>
             <div class="brand-text">
-              <div class="brand-title">ClosureAI</div>
-              <div class="brand-subtitle">Holiday Sanity Pass</div>
+              <div class="brand-title">{{BUSINESS_NAME}}</div>
+              <div class="brand-subtitle">with {{COACH_NAME}}</div>
             </div>
           </div>
           <div class="app-header-right">
@@ -265,7 +278,7 @@
 
             <div class="pass-banner" id="pass-banner">
               <span class="badge-soft badge-soft-success">
-                Holiday Sanity Pass active
+                Access active
               </span>
               <span class="pass-text">
                 · expires <span id="pass-expires-text">—</span>

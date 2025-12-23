@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Platform Admin - ClosureAI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+  <link rel="stylesheet" href="/css/platform.css" />
+</head>
+<body>
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <a href="/platform" class="admin-sidebar-brand">
+          <div class="admin-sidebar-brand-mark"></div>
+          <div>
+            <div class="admin-sidebar-title">ClosureAI</div>
+            <div class="admin-badge">Platform</div>
+          </div>
+        </a>
+      </div>
+
+      <nav class="admin-sidebar-nav">
+        <a href="/platform" class="admin-nav-item active">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          Dashboard
+        </a>
+        <a href="/platform/pending" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Pending Review
+          <span class="nav-badge" id="pending-badge"></span>
+        </a>
+        <a href="/platform/coaches" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          All Coaches
+        </a>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <a href="/dashboard" class="admin-back-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back to App
+        </a>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-header">
+        <h1 class="admin-header-title">Platform Dashboard</h1>
+      </header>
+
+      <div class="admin-content">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-card-label">Pending Review</div>
+            <div class="stat-card-value" id="stat-pending">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Active Coaches</div>
+            <div class="stat-card-value" id="stat-active">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Total Coaches</div>
+            <div class="stat-card-value" id="stat-total">-</div>
+          </div>
+        </div>
+
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Quick Actions</h2>
+          </div>
+          <div class="admin-card-body">
+            <div class="quick-actions">
+              <a href="/platform/pending" class="quick-action-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Review Pending Coaches
+              </a>
+              <a href="/platform/coaches" class="quick-action-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                View All Coaches
+              </a>
+              <a href="/onboard" class="quick-action-btn" target="_blank">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                View Onboarding Page
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Recent Coaches</h2>
+            <a href="/platform/coaches" class="btn-admin btn-admin-secondary btn-admin-sm">View All</a>
+          </div>
+          <div class="admin-card-body" id="recent-coaches">
+            <div class="admin-loading">
+              <div class="admin-spinner"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/admin.js"></script>
+  <script>
+    async function loadStats() {
+      try {
+        const data = await adminFetch('/api/platform/stats');
+        document.getElementById('stat-pending').textContent = data.pending_count || 0;
+        document.getElementById('stat-active').textContent = data.active_count || 0;
+        document.getElementById('stat-total').textContent = data.total_coaches || 0;
+
+        const badge = document.getElementById('pending-badge');
+        if (data.pending_count > 0) {
+          badge.textContent = data.pending_count;
+          badge.style.display = 'inline-flex';
+        }
+      } catch (err) {
+        console.error('Failed to load stats:', err);
+      }
+    }
+
+    async function loadRecentCoaches() {
+      const container = document.getElementById('recent-coaches');
+      try {
+        const data = await adminFetch('/api/platform/coaches');
+        const coaches = (data.coaches || []).slice(0, 5);
+
+        if (!coaches.length) {
+          container.innerHTML = '<p style="color: #64748b;">No coaches yet</p>';
+          return;
+        }
+
+        container.innerHTML = `
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Business</th>
+                <th>Coach</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${coaches.map(c => `
+                <tr>
+                  <td>${escapeHtml(c.businessName || '-')}</td>
+                  <td>${escapeHtml(c.coachName || '-')}</td>
+                  <td><span class="status-badge status-${c.status}">${c.status}</span></td>
+                  <td>
+                    <a href="/platform/coach/${c.id}" class="btn-admin btn-admin-secondary btn-admin-sm">View</a>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch (err) {
+        console.error('Failed to load coaches:', err);
+        container.innerHTML = '<p style="color: #ef4444;">Failed to load coaches</p>';
+      }
+    }
+
+    loadStats();
+    loadRecentCoaches();
+  </script>
+</body>
+</html>

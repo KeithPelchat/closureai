@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Get Started - ClosureAI Coach Platform</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/onboard.css" />
+</head>
+<body>
+  <div class="onboard-shell">
+    <header class="onboard-header">
+      <a href="/" class="onboard-logo">
+        <div class="onboard-logo-mark"></div>
+        <span class="onboard-logo-text">ClosureAI</span>
+      </a>
+    </header>
+
+    <main class="onboard-main">
+      <div class="onboard-hero">
+        <h1 class="onboard-title">Launch Your AI-Powered Coaching App</h1>
+        <p class="onboard-subtitle">
+          Get your own branded clarity coaching platform, fully configured and ready for your clients in 2 business days.
+        </p>
+      </div>
+
+      <div class="onboard-pricing-card">
+        <div class="pricing-header">
+          <h2 class="pricing-title">Done-For-You Setup</h2>
+          <p class="pricing-desc">Everything you need to deliver AI-assisted coaching</p>
+        </div>
+
+        <div class="pricing-amounts">
+          <div class="pricing-setup">
+            <span class="pricing-label">Setup Fee</span>
+            <span class="pricing-value">$2,495</span>
+            <span class="pricing-note">one-time</span>
+          </div>
+          <div class="pricing-divider"></div>
+          <div class="pricing-monthly">
+            <span class="pricing-label">Monthly</span>
+            <span class="pricing-value">$97</span>
+            <span class="pricing-note">/month</span>
+          </div>
+        </div>
+
+        <ul class="pricing-features">
+          <li>Your own branded coaching app</li>
+          <li>Custom domain (yoursite.com)</li>
+          <li>AI trained on your coaching style</li>
+          <li>Unlimited client sessions</li>
+          <li>Client dashboard & history</li>
+          <li>Offer integration & CTAs</li>
+          <li>2 business day setup guarantee</li>
+        </ul>
+
+        <button id="checkout-btn" class="btn-checkout">
+          Get Started - Pay $2,592 Today
+        </button>
+        <p class="pricing-breakdown">
+          Includes setup fee ($2,495) + first month ($97)
+        </p>
+      </div>
+
+      <div class="onboard-trust">
+        <p>Questions? Email <a href="mailto:support@getclosureai.com">support@getclosureai.com</a></p>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://js.stripe.com/v3/"></script>
+  <script>
+    const checkoutBtn = document.getElementById('checkout-btn');
+
+    checkoutBtn.addEventListener('click', async () => {
+      checkoutBtn.disabled = true;
+      checkoutBtn.textContent = 'Redirecting to checkout...';
+
+      try {
+        const res = await fetch('/api/onboard/create-checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        const data = await res.json();
+
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          throw new Error(data.error || 'Failed to create checkout session');
+        }
+      } catch (err) {
+        console.error('Checkout error:', err);
+        alert('Something went wrong. Please try again.');
+        checkoutBtn.disabled = false;
+        checkoutBtn.textContent = 'Get Started - Pay $2,592 Today';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Coach Details - ClosureAI Platform</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+  <link rel="stylesheet" href="/css/platform.css" />
+</head>
+<body>
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <a href="/platform" class="admin-sidebar-brand">
+          <div class="admin-sidebar-brand-mark"></div>
+          <div>
+            <div class="admin-sidebar-title">ClosureAI</div>
+            <div class="admin-badge">Platform</div>
+          </div>
+        </a>
+      </div>
+
+      <nav class="admin-sidebar-nav">
+        <a href="/platform" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          Dashboard
+        </a>
+        <a href="/platform/pending" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Pending Review
+        </a>
+        <a href="/platform/coaches" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          All Coaches
+        </a>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <a href="/dashboard" class="admin-back-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back to App
+        </a>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-header">
+        <div>
+          <a href="/platform/coaches" style="font-size: 13px; color: #64748b; text-decoration: none;">← All Coaches</a>
+          <h1 class="admin-header-title" id="page-title">Coach Details</h1>
+        </div>
+        <div class="admin-header-actions" id="header-actions"></div>
+      </header>
+
+      <div class="admin-content" id="coach-content">
+        <div class="admin-loading">
+          <div class="admin-spinner"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/admin.js"></script>
+  <script>
+    const coachId = window.location.pathname.split('/').pop();
+    let coachData = null;
+
+    async function loadCoach() {
+      const container = document.getElementById('coach-content');
+      try {
+        coachData = await adminFetch(`/api/platform/coaches/${coachId}`);
+
+        document.getElementById('page-title').textContent = coachData.businessName || 'Coach Details';
+        renderActions();
+        renderContent();
+      } catch (err) {
+        console.error('Failed to load coach:', err);
+        container.innerHTML = '<p style="color: #ef4444;">Failed to load coach details</p>';
+      }
+    }
+
+    function renderActions() {
+      const container = document.getElementById('header-actions');
+      let html = `<button class="btn-admin btn-admin-ghost" onclick="openEditModal()">Edit</button>`;
+
+      if (coachData.status === 'pending_review') {
+        html += `
+          <button class="btn-admin btn-admin-primary" onclick="approveCoach()">Approve & Launch</button>
+        `;
+      } else if (coachData.status === 'active') {
+        html += `
+          <button class="btn-admin btn-admin-danger" onclick="suspendCoach()">Suspend</button>
+        `;
+      } else if (coachData.status === 'suspended') {
+        html += `
+          <button class="btn-admin btn-admin-primary" onclick="reactivateCoach()">Reactivate</button>
+        `;
+      }
+
+      container.innerHTML = html;
+    }
+
+    function renderContent() {
+      const c = coachData;
+      const container = document.getElementById('coach-content');
+
+      container.innerHTML = `
+        <div class="coach-detail-grid">
+          <div class="coach-detail-main">
+            <!-- Status -->
+            <div class="admin-card">
+              <div class="admin-card-header">
+                <h2 class="admin-card-title">Status</h2>
+                <span class="status-badge status-${c.status}">${c.status}</span>
+              </div>
+              <div class="admin-card-body">
+                <div class="detail-grid">
+                  <div class="detail-item">
+                    <span class="detail-label">Setup Paid</span>
+                    <span class="detail-value">${c.setupPaidAt ? formatDateTime(c.setupPaidAt) : '-'}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Approved</span>
+                    <span class="detail-value">${c.approvedAt ? formatDateTime(c.approvedAt) : '-'}</span>
+                  </div>
+                  ${c.suspendedAt ? `
+                  <div class="detail-item">
+                    <span class="detail-label">Suspended</span>
+                    <span class="detail-value">${formatDateTime(c.suspendedAt)}</span>
+                  </div>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+
+            <!-- Business Info -->
+            <div class="admin-card">
+              <div class="admin-card-header">
+                <h2 class="admin-card-title">Business Info</h2>
+              </div>
+              <div class="admin-card-body">
+                <div class="detail-grid">
+                  <div class="detail-item">
+                    <span class="detail-label">Business Name</span>
+                    <span class="detail-value">${escapeHtml(c.businessName || '-')}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Coach Name</span>
+                    <span class="detail-value">${escapeHtml(c.coachName || '-')}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Email</span>
+                    <span class="detail-value">${escapeHtml(c.coachEmail || '-')}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Phone</span>
+                    <span class="detail-value">${escapeHtml(c.coachPhone || '-')}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Niche</span>
+                    <span class="detail-value">${escapeHtml(c.coachingNiche || '-')}</span>
+                  </div>
+                </div>
+                ${c.targetAudience ? `
+                <div class="detail-item" style="margin-top: 16px;">
+                  <span class="detail-label">Target Audience</span>
+                  <p class="detail-text">${escapeHtml(c.targetAudience)}</p>
+                </div>
+                ` : ''}
+              </div>
+            </div>
+
+            <!-- Coaching Style -->
+            <div class="admin-card">
+              <div class="admin-card-header">
+                <h2 class="admin-card-title">Coaching Style</h2>
+              </div>
+              <div class="admin-card-body">
+                ${c.coachingStyle ? `
+                <div class="detail-item">
+                  <span class="detail-label">Approach</span>
+                  <p class="detail-text">${escapeHtml(c.coachingStyle)}</p>
+                </div>
+                ` : ''}
+                ${c.coachBio ? `
+                <div class="detail-item" style="margin-top: 16px;">
+                  <span class="detail-label">Bio</span>
+                  <p class="detail-text">${escapeHtml(c.coachBio)}</p>
+                </div>
+                ` : ''}
+                ${!c.coachingStyle && !c.coachBio ? '<p style="color: #64748b;">No coaching style info provided</p>' : ''}
+              </div>
+            </div>
+
+            <!-- Offers -->
+            <div class="admin-card">
+              <div class="admin-card-header">
+                <h2 class="admin-card-title">Offers</h2>
+              </div>
+              <div class="admin-card-body">
+                ${c.offers && c.offers.length ? c.offers.map(o => `
+                  <div class="offer-preview">
+                    <strong>${escapeHtml(o.title)}</strong>
+                    ${o.description ? `<p>${escapeHtml(o.description)}</p>` : ''}
+                    ${o.url ? `<a href="${escapeHtml(o.url)}" target="_blank">${escapeHtml(o.url)}</a>` : ''}
+                  </div>
+                `).join('') : '<p style="color: #64748b;">No offers configured</p>'}
+              </div>
+            </div>
+          </div>
+
+          <div class="coach-detail-side">
+            <!-- Branding -->
+            <div class="admin-card">
+              <div class="admin-card-header">
+                <h2 class="admin-card-title">Branding</h2>
+              </div>
+              <div class="admin-card-body">
+                ${c.logoUrl ? `
+                <div class="logo-preview-box">
+                  <img src="${c.logoUrl}" alt="Logo" />
+                </div>
+                ` : '<p style="color: #64748b; margin-bottom: 16px;">No logo uploaded</p>'}
+                <div class="color-swatches">
+                  <div class="color-swatch">
+                    <div class="swatch" style="background: ${c.primaryColor || '#0ea5e9'}"></div>
+                    <span>Primary: ${c.primaryColor || '#0ea5e9'}</span>
+                  </div>
+                  <div class="color-swatch">
+                    <div class="swatch" style="background: ${c.secondaryColor || '#38bdf8'}"></div>
+                    <span>Secondary: ${c.secondaryColor || '#38bdf8'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Domain -->
+            <div class="admin-card">
+              <div class="admin-card-header">
+                <h2 class="admin-card-title">Domain</h2>
+              </div>
+              <div class="admin-card-body">
+                ${c.customDomain ? `
+                <p><strong>Custom:</strong> ${escapeHtml(c.customDomain)}</p>
+                ` : ''}
+                ${c.subdomain ? `
+                <p><strong>Subdomain:</strong> ${escapeHtml(c.subdomain)}.getclosureai.com</p>
+                ` : ''}
+                ${!c.customDomain && !c.subdomain ? '<p style="color: #64748b;">No domain configured</p>' : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function approveCoach() {
+      if (!confirm('Approve and launch this coach? They will receive a welcome email and can start using their app immediately.')) return;
+
+      try {
+        await adminFetch(`/api/platform/coaches/${coachId}/approve`, { method: 'POST' });
+        showToast('Coach approved and launched!');
+        loadCoach();
+      } catch (err) {
+        showToast('Failed to approve coach: ' + err.message, 'error');
+      }
+    }
+
+    async function suspendCoach() {
+      if (!confirm('Suspend this coach? They will lose access to their app.')) return;
+
+      try {
+        await adminFetch(`/api/platform/coaches/${coachId}/suspend`, { method: 'POST' });
+        showToast('Coach suspended');
+        loadCoach();
+      } catch (err) {
+        showToast('Failed to suspend coach: ' + err.message, 'error');
+      }
+    }
+
+    async function reactivateCoach() {
+      if (!confirm('Reactivate this coach?')) return;
+
+      try {
+        await adminFetch(`/api/platform/coaches/${coachId}/reactivate`, { method: 'POST' });
+        showToast('Coach reactivated');
+        loadCoach();
+      } catch (err) {
+        showToast('Failed to reactivate coach: ' + err.message, 'error');
+      }
+    }
+
+    // Edit modal functions
+    function openEditModal() {
+      const c = coachData;
+      const modal = document.createElement('div');
+      modal.id = 'edit-modal';
+      modal.className = 'admin-modal-overlay';
+      modal.innerHTML = `
+        <div class="admin-modal" style="max-width: 700px;">
+          <div class="admin-modal-header">
+            <h2 class="admin-modal-title">Edit Coach</h2>
+            <button class="admin-modal-close" onclick="closeEditModal()">&times;</button>
+          </div>
+          <div class="admin-modal-body" style="max-height: 70vh; overflow-y: auto;">
+            <form id="edit-coach-form">
+              <div class="form-section">
+                <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #0f172a;">Status</h3>
+                <div class="form-group">
+                  <label class="form-label">Account Status</label>
+                  <select name="status" class="form-input">
+                    <option value="pending_onboarding" ${c.status === 'pending_onboarding' ? 'selected' : ''}>Pending Onboarding</option>
+                    <option value="pending_review" ${c.status === 'pending_review' ? 'selected' : ''}>Pending Review</option>
+                    <option value="active" ${c.status === 'active' ? 'selected' : ''}>Active</option>
+                    <option value="suspended" ${c.status === 'suspended' ? 'selected' : ''}>Suspended</option>
+                    <option value="cancelled" ${c.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-section" style="margin-top: 20px;">
+                <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #0f172a;">Business Info</h3>
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label class="form-label">Business Name</label>
+                    <input type="text" name="business_name" class="form-input" value="${escapeHtml(c.businessName || '')}">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Coach Name</label>
+                    <input type="text" name="coach_name" class="form-input" value="${escapeHtml(c.coachName || '')}">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="coach_email" class="form-input" value="${escapeHtml(c.coachEmail || '')}">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Phone</label>
+                    <input type="tel" name="coach_phone" class="form-input" value="${escapeHtml(c.coachPhone || '')}">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Coaching Niche</label>
+                    <select name="coaching_niche" class="form-input">
+                      <option value="">Select niche...</option>
+                      <option value="life" ${c.coachingNiche === 'life' ? 'selected' : ''}>Life Coaching</option>
+                      <option value="executive" ${c.coachingNiche === 'executive' ? 'selected' : ''}>Executive / Leadership</option>
+                      <option value="health" ${c.coachingNiche === 'health' ? 'selected' : ''}>Health & Wellness</option>
+                      <option value="relationship" ${c.coachingNiche === 'relationship' ? 'selected' : ''}>Relationship</option>
+                      <option value="career" ${c.coachingNiche === 'career' ? 'selected' : ''}>Career</option>
+                      <option value="mindset" ${c.coachingNiche === 'mindset' ? 'selected' : ''}>Mindset / Performance</option>
+                      <option value="spiritual" ${c.coachingNiche === 'spiritual' ? 'selected' : ''}>Spiritual</option>
+                      <option value="other" ${c.coachingNiche === 'other' ? 'selected' : ''}>Other</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group" style="margin-top: 12px;">
+                  <label class="form-label">Target Audience</label>
+                  <textarea name="target_audience" class="form-input" rows="2">${escapeHtml(c.targetAudience || '')}</textarea>
+                </div>
+              </div>
+
+              <div class="form-section" style="margin-top: 20px;">
+                <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #0f172a;">Coaching Style</h3>
+                <div class="form-group">
+                  <label class="form-label">Coaching Approach</label>
+                  <textarea name="coaching_style" class="form-input" rows="3">${escapeHtml(c.coachingStyle || '')}</textarea>
+                </div>
+                <div class="form-group" style="margin-top: 12px;">
+                  <label class="form-label">Coach Bio</label>
+                  <textarea name="coach_bio" class="form-input" rows="3">${escapeHtml(c.coachBio || '')}</textarea>
+                </div>
+              </div>
+
+              <div class="form-section" style="margin-top: 20px;">
+                <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #0f172a;">Domain & Branding</h3>
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label class="form-label">Subdomain</label>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                      <input type="text" name="subdomain" class="form-input" value="${escapeHtml(c.subdomain || '')}" style="flex: 1;">
+                      <span style="color: #64748b; font-size: 13px;">.getclosureai.com</span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Custom Domain</label>
+                    <input type="text" name="custom_domain" class="form-input" value="${escapeHtml(c.customDomain || '')}" placeholder="e.g., app.coachsite.com">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Primary Color</label>
+                    <input type="color" name="primary_color" value="${c.primaryColor || '#0ea5e9'}" style="width: 60px; height: 36px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer;">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Secondary Color</label>
+                    <input type="color" name="secondary_color" value="${c.secondaryColor || '#38bdf8'}" style="width: 60px; height: 36px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer;">
+                  </div>
+                </div>
+                <div class="form-group" style="margin-top: 12px;">
+                  <label class="form-label">Logo URL</label>
+                  <input type="url" name="logo_url" class="form-input" value="${escapeHtml(c.logoUrl || '')}" placeholder="https://...">
+                </div>
+              </div>
+
+              <div class="form-section" style="margin-top: 20px;">
+                <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #0f172a;">Advanced</h3>
+                <div class="form-group">
+                  <label class="form-label">Custom System Prompt (optional)</label>
+                  <textarea name="custom_system_prompt" class="form-input" rows="4" placeholder="Leave blank to use default template">${escapeHtml(c.customSystemPrompt || '')}</textarea>
+                  <p style="font-size: 12px; color: #64748b; margin-top: 4px;">Override the AI system prompt. Leave blank to use the standard coach template.</p>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="admin-modal-footer">
+            <button type="button" class="btn-admin btn-admin-ghost" onclick="closeEditModal()">Cancel</button>
+            <button type="button" class="btn-admin btn-admin-primary" onclick="saveCoach()">Save Changes</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      setTimeout(() => modal.classList.add('open'), 10);
+    }
+
+    function closeEditModal() {
+      const modal = document.getElementById('edit-modal');
+      if (modal) {
+        modal.classList.remove('open');
+        setTimeout(() => modal.remove(), 200);
+      }
+    }
+
+    async function saveCoach() {
+      const form = document.getElementById('edit-coach-form');
+      const formData = new FormData(form);
+      const data = {};
+      formData.forEach((value, key) => {
+        data[key] = value;
+      });
+
+      try {
+        await adminFetch(`/api/platform/coaches/${coachId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        showToast('Coach updated successfully');
+        closeEditModal();
+        loadCoach();
+      } catch (err) {
+        showToast('Failed to update coach: ' + err.message, 'error');
+      }
+    }
+
+    loadCoach();
+  </script>
+
+  <style>
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .form-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+    }
+    .form-input {
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: #0ea5e9;
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+    }
+    textarea.form-input {
+      resize: vertical;
+      font-family: inherit;
+    }
+    @media (max-width: 600px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</body>
+</html>

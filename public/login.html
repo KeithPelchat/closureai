@@ -16,6 +16,11 @@
 
     <link rel="stylesheet" href="/styles.css" />
     <style>
+      /* Tenant theming via CSS variables */
+      :root {
+        --primary-color: {{PRIMARY_COLOR}};
+        --secondary-color: {{SECONDARY_COLOR}};
+      }
       /* Light, neutral layout that should sit on top of your global styles */
 
       body {
@@ -107,8 +112,8 @@
       }
 
       .auth-input:focus {
-        border-color: #4f46e5;
-        box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.15);
+        border-color: var(--primary-color, #4f46e5);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary-color, #4f46e5) 15%, transparent);
       }
 
       .auth-actions {
@@ -129,7 +134,7 @@
         font-size: 14px;
         font-weight: 600;
         cursor: pointer;
-        background: #111827;
+        background: var(--primary-color, #111827);
         color: #f9fafb;
         width: 100%;
       }
@@ -211,10 +216,9 @@
           </div>
         </div>
 
-        <h1 class="auth-heading">Welcome back</h1>
+        <h1 class="auth-heading">{{LOGIN_HEADLINE}}</h1>
         <p class="auth-subcopy">
-          Use a one-time <strong>Secure Link</strong> or continue with Google.
-          No passwords to remember.
+          {{LOGIN_SUBHEADLINE}}
         </p>
 
         <form id="secure-link-form" novalidate>

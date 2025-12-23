@@ -1,0 +1,258 @@
+/* Platform Admin Styles */
+
+/* Nav badge */
+.nav-badge {
+  display: none;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #ef4444;
+  border-radius: 999px;
+  margin-left: auto;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Quick actions */
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.quick-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  text-decoration: none;
+  color: #334155;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.quick-action-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.quick-action-btn svg {
+  color: #0ea5e9;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+.status-pending_onboarding {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-pending_review {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-suspended {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-cancelled {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/* Pending cards */
+.pending-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pending-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.pending-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.pending-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.pending-card-subtitle {
+  font-size: 14px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.pending-card-meta {
+  display: flex;
+  gap: 24px;
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 16px;
+}
+
+.pending-card-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* Coach detail grid */
+.coach-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+}
+
+.coach-detail-main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.coach-detail-side {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (max-width: 1024px) {
+  .coach-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Detail grid */
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+}
+
+.detail-value {
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.detail-text {
+  font-size: 14px;
+  color: #475569;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Logo preview */
+.logo-preview-box {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.logo-preview-box img {
+  max-width: 100%;
+  max-height: 80px;
+  object-fit: contain;
+}
+
+/* Color swatches */
+.color-swatches {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.color-swatch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Offer preview */
+.offer-preview {
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.offer-preview:last-child {
+  margin-bottom: 0;
+}
+
+.offer-preview strong {
+  display: block;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.offer-preview p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 4px 0;
+}
+
+.offer-preview a {
+  font-size: 13px;
+  color: #0ea5e9;
+}
+
+/* Header actions */
+.admin-header-actions {
+  display: flex;
+  gap: 12px;
+}

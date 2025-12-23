@@ -2,12 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>ClosureAI – Clarity Session</title>
+    <title>{{APP_NAME}} – Clarity Session</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="{{PRIMARY_COLOR}}" />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/css/offers.css" />
 
     <style>
+      /* Tenant theming via CSS variables */
+      :root {
+        --primary-color: {{PRIMARY_COLOR}};
+        --secondary-color: {{SECONDARY_COLOR}};
+      }
       /* ---- Let the page scroll naturally ---- */
 
       html,
@@ -180,7 +186,7 @@
       }
 
       .chat-row-user .chat-bubble {
-        background: #0ea5e9;
+        background: var(--primary-color, #0ea5e9);
         color: #f9fafb;
         border-bottom-right-radius: 4px;
         font-size: 18px;
@@ -224,8 +230,8 @@
 
       .composer textarea:focus {
         outline: none;
-        border-color: #0ea5e9;
-        box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.25);
+        border-color: var(--primary-color, #0ea5e9);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary-color, #0ea5e9) 25%, transparent);
       }
 
       .composer-footer {
@@ -342,10 +348,17 @@
       <header class="app-header">
         <div class="app-header-inner">
           <div class="brand">
-            <div class="brand-mark"></div>
+            <img
+              src="{{APP_LOGO}}"
+              alt="{{APP_NAME}}"
+              class="brand-logo"
+              style="height: 36px; width: auto; border-radius: 6px;"
+              onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+            />
+            <div class="brand-mark" style="background: var(--primary-color, #0d9488); display: none;"></div>
             <div class="brand-text">
-              <div class="brand-title">ClosureAI</div>
-              <div class="brand-subtitle">Holiday Sanity Pass</div>
+              <div class="brand-title">{{BUSINESS_NAME}}</div>
+              <div class="brand-subtitle">with {{COACH_NAME}}</div>
             </div>
           </div>
           <div class="app-header-right">
@@ -371,7 +384,7 @@
             <div class="session-how">
               <h2>How this works</h2>
               <p>
-                ClosureAI helps you slow down and unpack one situation at a
+                {{BUSINESS_NAME}} helps you slow down and unpack one situation at a
                 time:
               </p>
               <ul>
@@ -391,7 +404,7 @@
               <div class="session-card-header">
                 <strong>Your conversation</strong>
                 <span style="color:#6b7280;">
-                  · Your messages and ClosureAI’s replies will appear here.
+                  · Your messages and {{COACH_NAME}}'s replies will appear here.
                 </span>
               </div>
 
@@ -441,8 +454,8 @@
                   </div>
 
                   <p class="session-disclaimer">
-                    <strong>Important:</strong> ClosureAI is not therapy and
-                    doesn’t provide medical, legal, or crisis advice. If you’re
+                    <strong>Important:</strong> {{BUSINESS_NAME}} is not therapy and
+                    doesn't provide medical, legal, or crisis advice. If you're
                     in crisis or thinking about harming yourself or others,
                     please contact local emergency services or a crisis hotline
                     in your area.
@@ -462,6 +475,10 @@
 
     <script src="/js/offers.js"></script>
     <script>
+      // Tenant branding (injected from server)
+      const TENANT_BUSINESS_NAME = "{{BUSINESS_NAME}}";
+      const TENANT_COACH_NAME = "{{COACH_NAME}}";
+
       // ---------- Shared fetch helper ----------
       async function fetchJSON(url, options) {
         const res = await fetch(url, {
@@ -547,7 +564,7 @@
 
           const label = document.createElement("div");
           label.className = "chat-label";
-          label.textContent = role === "user" ? "You" : "ClosureAI";
+          label.textContent = role === "user" ? "You" : TENANT_COACH_NAME;
 
           const bubble = document.createElement("div");
           bubble.className = "chat-bubble";

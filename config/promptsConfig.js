@@ -1,7 +1,26 @@
 // config/promptsConfig.js
 
-const baseSystemPrompt = `
-You are ClosureAI, an AI-guided reflection space for the "Holiday Sanity Pass."
+// -----------------------------------------------------------------
+// Generic Coach Template - used for all white-label coaching apps
+// Placeholders: {{BUSINESS_NAME}}, {{COACH_NAME}}, {{COACHING_NICHE}},
+//               {{TARGET_AUDIENCE}}, {{COACHING_STYLE}}, {{COACH_BIO}}
+// -----------------------------------------------------------------
+
+const coachSystemPromptTemplate = `
+You are an AI coaching assistant for {{BUSINESS_NAME}}, created by {{COACH_NAME}}.
+{{#COACHING_NICHE}}You specialize in {{COACHING_NICHE}}.{{/COACHING_NICHE}}
+{{#TARGET_AUDIENCE}}You primarily work with {{TARGET_AUDIENCE}}.{{/TARGET_AUDIENCE}}
+
+{{#COACHING_STYLE}}
+Coaching approach:
+{{COACHING_STYLE}}
+{{/COACHING_STYLE}}
+
+{{#COACH_BIO}}
+About your coach:
+{{COACH_BIO}}
+{{/COACH_BIO}}
+
 Your job is NOT to give quick answers. Your job is to help the user slow down,
 organize what happened, notice what it brings up for them, and leave with
 clearer language and grounded next steps.
@@ -281,6 +300,66 @@ Sound warm and encouraging, and make it clear this is a good place to pause.
 }
 
 // -----------------------------------------------------------------
+// Build coach-specific prompt from template + app data
+// -----------------------------------------------------------------
+
+function buildCoachBasePrompt(app = {}) {
+  // If coach provided a custom system prompt, use it directly
+  if (app.custom_system_prompt && app.custom_system_prompt.trim()) {
+    return app.custom_system_prompt;
+  }
+
+  // Otherwise, build from template
+  let prompt = coachSystemPromptTemplate;
+
+  // Simple placeholder replacement
+  const replacements = {
+    '{{BUSINESS_NAME}}': app.business_name || app.name || 'this coaching service',
+    '{{COACH_NAME}}': app.coach_name || 'your coach',
+    '{{COACHING_NICHE}}': app.coaching_niche || '',
+    '{{TARGET_AUDIENCE}}': app.target_audience || '',
+    '{{COACHING_STYLE}}': app.coaching_style || '',
+    '{{COACH_BIO}}': app.coach_bio || '',
+  };
+
+  // Replace simple placeholders
+  for (const [placeholder, value] of Object.entries(replacements)) {
+    prompt = prompt.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), value);
+  }
+
+  // Handle conditional sections: {{#FIELD}}content{{/FIELD}}
+  // These sections are only included if the field has a value
+  const conditionalFields = ['COACHING_NICHE', 'TARGET_AUDIENCE', 'COACHING_STYLE', 'COACH_BIO'];
+  for (const field of conditionalFields) {
+    const regex = new RegExp(`\\{\\{#${field}\\}\\}([\\s\\S]*?)\\{\\{/${field}\\}\\}`, 'g');
+    const value = replacements[`{{${field}}}`];
+    if (value && value.trim()) {
+      // Keep the content, remove the tags
+      prompt = prompt.replace(regex, '$1');
+    } else {
+      // Remove the entire section
+      prompt = prompt.replace(regex, '');
+    }
+  }
+
+  // Clean up extra blank lines
+  prompt = prompt.replace(/\n{3,}/g, '\n\n');
+
+  return prompt;
+}
+
+// -----------------------------------------------------------------
+// Legacy ClosureAI prompt (for backward compatibility)
+// -----------------------------------------------------------------
+
+const legacyClosureAIPrompt = `
+You are ClosureAI, an AI-guided reflection space for the "Holiday Sanity Pass."
+Your job is NOT to give quick answers. Your job is to help the user slow down,
+organize what happened, notice what it brings up for them, and leave with
+clearer language and grounded next steps.
+`;
+
+// -----------------------------------------------------------------
 // Exports
 // -----------------------------------------------------------------
 
@@ -291,12 +370,18 @@ module.exports = {
   // How many assistant turns before we treat it as "wrap-up mode"
   maxAssistantTurns: parseInt(process.env.CLOSUREAI_MAX_TURNS || "6", 10),
 
-  // The base system prompt (can be swapped per micro-app)
-  systemPrompt: baseSystemPrompt,
+  // The coach template (for reference)
+  coachSystemPromptTemplate,
 
-  // New: Dynamic prompt builder with offer injection
+  // Build a coach-specific base prompt from app data
+  buildCoachBasePrompt,
+
+  // Legacy: The base system prompt (kept for backward compatibility)
+  systemPrompt: coachSystemPromptTemplate,
+
+  // Dynamic prompt builder with offer injection
   buildSystemPrompt,
 
-  // New: Helper to format offers
+  // Helper to format offers
   formatOffersForPrompt,
 };

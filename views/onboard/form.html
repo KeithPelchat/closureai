@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Complete Your Setup - ClosureAI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/onboard.css" />
+</head>
+<body>
+  <div class="onboard-shell">
+    <header class="onboard-header">
+      <a href="/" class="onboard-logo">
+        <div class="onboard-logo-mark"></div>
+        <span class="onboard-logo-text">ClosureAI</span>
+      </a>
+      <div class="onboard-progress">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <span class="progress-text" id="progress-text">Step 1 of 6</span>
+      </div>
+    </header>
+
+    <main class="onboard-main onboard-form-main">
+      <!-- Step 1: Business Info -->
+      <section class="form-step active" data-step="1">
+        <h2 class="step-title">Tell us about your coaching business</h2>
+        <p class="step-desc">This helps us configure your app perfectly.</p>
+
+        <div class="form-group">
+          <label class="form-label">Business Name</label>
+          <input type="text" class="form-input" id="business_name" placeholder="e.g., Sarah's Clarity Coaching" required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Your Name</label>
+            <input type="text" class="form-input" id="coach_name" placeholder="e.g., Sarah Johnson" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone</label>
+            <input type="tel" class="form-input" id="coach_phone" placeholder="(555) 123-4567" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-input" id="coach_email" readonly />
+          <p class="form-hint">From your payment - can't be changed</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Coaching Niche</label>
+          <select class="form-select" id="coaching_niche" required>
+            <option value="">Select your niche...</option>
+            <option value="life">Life Coaching</option>
+            <option value="executive">Executive / Leadership</option>
+            <option value="health">Health & Wellness</option>
+            <option value="relationship">Relationship</option>
+            <option value="career">Career</option>
+            <option value="mindset">Mindset / Performance</option>
+            <option value="spiritual">Spiritual</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Who do you help? (Target Audience)</label>
+          <textarea class="form-textarea" id="target_audience" rows="3" placeholder="e.g., Busy professionals in their 40s who feel stuck and want more fulfillment..."></textarea>
+        </div>
+      </section>
+
+      <!-- Step 2: Branding -->
+      <section class="form-step" data-step="2">
+        <h2 class="step-title">Brand your app</h2>
+        <p class="step-desc">Upload your logo and pick your colors.</p>
+
+        <div class="form-group">
+          <label class="form-label">Logo</label>
+          <div class="logo-upload" id="logo-upload">
+            <div class="logo-preview" id="logo-preview">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span>Click to upload logo</span>
+            </div>
+            <input type="file" id="logo_file" accept="image/*" hidden />
+          </div>
+          <p class="form-hint">PNG or JPG, recommended 400x400px or larger</p>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Primary Color</label>
+            <div class="color-picker-wrap">
+              <input type="color" class="color-picker" id="primary_color" value="#0ea5e9" />
+              <input type="text" class="form-input color-hex" id="primary_color_hex" value="#0ea5e9" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Secondary Color</label>
+            <div class="color-picker-wrap">
+              <input type="color" class="color-picker" id="secondary_color" value="#38bdf8" />
+              <input type="text" class="form-input color-hex" id="secondary_color_hex" value="#38bdf8" />
+            </div>
+          </div>
+        </div>
+
+        <div class="brand-preview">
+          <div class="preview-label">Preview</div>
+          <div class="preview-card" id="brand-preview-card">
+            <div class="preview-header">
+              <div class="preview-logo" id="preview-logo"></div>
+              <span class="preview-name" id="preview-name">Your App</span>
+            </div>
+            <div class="preview-btn" id="preview-btn">Start Session</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 3: Coaching Style -->
+      <section class="form-step" data-step="3">
+        <h2 class="step-title">Your coaching style</h2>
+        <p class="step-desc">This shapes how the AI interacts with your clients.</p>
+
+        <div class="form-group">
+          <label class="form-label">How would you describe your coaching approach?</label>
+          <textarea class="form-textarea" id="coaching_style" rows="4" placeholder="e.g., I use a blend of CBT and mindfulness techniques. I'm warm but direct, and I like to use metaphors..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Brief bio (shown to AI for context)</label>
+          <textarea class="form-textarea" id="coach_bio" rows="4" placeholder="e.g., I've been coaching for 10 years, specializing in helping high-achievers find balance. I'm a certified ICF coach and author of..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Any specific phrases or language you use?</label>
+          <textarea class="form-textarea" id="coach_phrases" rows="3" placeholder="e.g., I often say 'What would your future self advise?' or 'Let's sit with that for a moment...'"></textarea>
+        </div>
+      </section>
+
+      <!-- Step 4: Offers -->
+      <section class="form-step" data-step="4">
+        <h2 class="step-title">Your offers</h2>
+        <p class="step-desc">These can be mentioned by the AI and shown to clients. Add up to 5.</p>
+
+        <div id="offers-container">
+          <!-- Offers added dynamically -->
+        </div>
+
+        <button type="button" class="btn-add-offer" id="add-offer-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Offer
+        </button>
+
+        <p class="form-hint" style="margin-top: 16px;">You can add more offers later from your admin dashboard.</p>
+      </section>
+
+      <!-- Step 5: Domain -->
+      <section class="form-step" data-step="5">
+        <h2 class="step-title">Choose your domain</h2>
+        <p class="step-desc">Where your clients will access your app.</p>
+
+        <div class="domain-options">
+          <label class="domain-option">
+            <input type="radio" name="domain_type" value="subdomain" checked />
+            <div class="domain-option-content">
+              <span class="domain-option-title">Use a subdomain (quick setup)</span>
+              <span class="domain-option-example" id="subdomain-preview">yourname.getclosureai.com</span>
+            </div>
+          </label>
+
+          <label class="domain-option">
+            <input type="radio" name="domain_type" value="custom" />
+            <div class="domain-option-content">
+              <span class="domain-option-title">Use my own domain</span>
+              <span class="domain-option-example">app.yoursite.com</span>
+            </div>
+          </label>
+        </div>
+
+        <div class="form-group" id="subdomain-input-group">
+          <label class="form-label">Choose your subdomain</label>
+          <div class="subdomain-input-wrap">
+            <input type="text" class="form-input subdomain-input" id="subdomain" placeholder="yourname" />
+            <span class="subdomain-suffix">.getclosureai.com</span>
+          </div>
+          <p class="form-hint" id="subdomain-status"></p>
+        </div>
+
+        <div class="form-group" id="custom-domain-group" style="display: none;">
+          <label class="form-label">Your custom domain</label>
+          <input type="text" class="form-input" id="custom_domain" placeholder="app.yoursite.com" />
+          <div class="dns-instructions">
+            <p><strong>DNS Setup Required:</strong></p>
+            <p>Add a CNAME record pointing to: <code>platform.getclosureai.com</code></p>
+            <p class="form-hint">We'll verify this during setup and configure SSL for you.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 6: Review -->
+      <section class="form-step" data-step="6">
+        <h2 class="step-title">Review & Submit</h2>
+        <p class="step-desc">Make sure everything looks good before we start building.</p>
+
+        <div class="review-section">
+          <div class="review-header">
+            <h3>Business Info</h3>
+            <button type="button" class="btn-edit" data-goto="1">Edit</button>
+          </div>
+          <div class="review-content" id="review-business"></div>
+        </div>
+
+        <div class="review-section">
+          <div class="review-header">
+            <h3>Branding</h3>
+            <button type="button" class="btn-edit" data-goto="2">Edit</button>
+          </div>
+          <div class="review-content" id="review-branding"></div>
+        </div>
+
+        <div class="review-section">
+          <div class="review-header">
+            <h3>Coaching Style</h3>
+            <button type="button" class="btn-edit" data-goto="3">Edit</button>
+          </div>
+          <div class="review-content" id="review-coaching"></div>
+        </div>
+
+        <div class="review-section">
+          <div class="review-header">
+            <h3>Offers</h3>
+            <button type="button" class="btn-edit" data-goto="4">Edit</button>
+          </div>
+          <div class="review-content" id="review-offers"></div>
+        </div>
+
+        <div class="review-section">
+          <div class="review-header">
+            <h3>Domain</h3>
+            <button type="button" class="btn-edit" data-goto="5">Edit</button>
+          </div>
+          <div class="review-content" id="review-domain"></div>
+        </div>
+
+        <div class="submit-notice">
+          <p><strong>What happens next?</strong></p>
+          <p>We'll configure your AI, set up your domain, and have everything ready within 2 business days. You'll receive an email when your app is live!</p>
+        </div>
+      </section>
+
+      <!-- Navigation -->
+      <div class="form-nav">
+        <button type="button" class="btn-nav btn-prev" id="prev-btn" style="visibility: hidden;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back
+        </button>
+        <button type="button" class="btn-nav btn-next" id="next-btn">
+          Next
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+        <button type="button" class="btn-nav btn-submit" id="submit-btn" style="display: none;">
+          Submit for Setup
+        </button>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/onboard.js"></script>
+</body>
+</html>
