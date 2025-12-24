@@ -21,7 +21,6 @@
         --primary-color: {{PRIMARY_COLOR}};
         --secondary-color: {{SECONDARY_COLOR}};
       }
-      /* Light, neutral layout that should sit on top of your global styles */
 
       body {
         margin: 0;
@@ -116,6 +115,37 @@
         box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary-color, #4f46e5) 15%, transparent);
       }
 
+      .password-input-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+
+      .password-input-wrap .auth-input {
+        padding-right: 60px;
+      }
+
+      .password-toggle {
+        position: absolute;
+        right: 8px;
+        background: none;
+        border: none;
+        color: #6b7280;
+        font-size: 12px;
+        cursor: pointer;
+        padding: 4px 8px;
+      }
+
+      .password-toggle:hover {
+        color: #374151;
+      }
+
+      .password-hint {
+        font-size: 11px;
+        color: #9ca3af;
+        margin: 2px 0 0;
+      }
+
       .auth-actions {
         margin-top: 8px;
         display: flex;
@@ -189,14 +219,50 @@
       .auth-status {
         margin-top: 8px;
         font-size: 12px;
+        padding: 8px 12px;
+        border-radius: 8px;
       }
 
       .auth-status--ok {
         color: #15803d;
+        background: #dcfce7;
       }
 
       .auth-status--error {
         color: #b91c1c;
+        background: #fee2e2;
+      }
+
+      .auth-status:empty {
+        display: none;
+      }
+
+      .auth-links {
+        margin-top: 12px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+      }
+
+      .auth-link {
+        color: var(--primary-color, #4f46e5);
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .auth-link:hover {
+        text-decoration: underline;
+      }
+
+      .auth-mode-toggle {
+        margin-top: 16px;
+        text-align: center;
+        font-size: 13px;
+        color: #6b7280;
+      }
+
+      .hidden {
+        display: none !important;
       }
     </style>
   </head>
@@ -212,18 +278,18 @@
           />
           <div class="auth-brand-text">
             <span class="auth-brand-title">{{APP_NAME}}</span>
-            <span class="auth-brand-subtitle">Secure sign in</span>
+            <span class="auth-brand-subtitle" id="auth-subtitle">Sign in</span>
           </div>
         </div>
 
-        <h1 class="auth-heading">{{LOGIN_HEADLINE}}</h1>
-        <p class="auth-subcopy">
+        <h1 class="auth-heading" id="auth-heading">{{LOGIN_HEADLINE}}</h1>
+        <p class="auth-subcopy" id="auth-subcopy">
           {{LOGIN_SUBHEADLINE}}
         </p>
 
-        <form id="secure-link-form" novalidate>
-          <div class="auth-field-group">
-            <label for="name" class="auth-label">Name (optional)</label>
+        <form id="auth-form" novalidate>
+          <div class="auth-field-group" id="name-group">
+            <label for="name" class="auth-label">Name</label>
             <input
               id="name"
               name="name"
@@ -247,13 +313,36 @@
             />
           </div>
 
+          <div class="auth-field-group" id="password-group">
+            <label for="password" class="auth-label">Password</label>
+            <div class="password-input-wrap">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                class="auth-input"
+                autocomplete="current-password"
+                placeholder="Enter your password"
+              />
+              <button type="button" class="password-toggle" id="password-toggle">Show</button>
+            </div>
+            <p class="password-hint" id="password-hint">
+              Min 8 characters, 1 uppercase, 1 number
+            </p>
+          </div>
+
           <div class="auth-actions">
-            <button id="secure-link-submit" type="submit" class="btn-primary">
-              Email me a Secure Link
+            <button id="submit-btn" type="submit" class="btn-primary">
+              Sign In
             </button>
           </div>
 
-          <div id="secure-link-status" class="auth-status"></div>
+          <div class="auth-links" id="auth-links">
+            <span class="auth-link" id="forgot-link">Forgot password?</span>
+            <span class="auth-link" id="resend-link" style="display: none;">Resend verification</span>
+          </div>
+
+          <div id="auth-status" class="auth-status"></div>
         </form>
 
         <div class="auth-or">
@@ -263,7 +352,6 @@
         </div>
 
         <button id="google-btn" type="button" class="btn-secondary">
-          <!-- Minimal "G" shape, text-only fallback if CSS/images differ -->
           <span
             style="
               width: 16px;
@@ -281,6 +369,11 @@
           <span>Continue with Google</span>
         </button>
 
+        <div class="auth-mode-toggle" id="auth-mode-toggle">
+          <span>Need an account? </span>
+          <span class="auth-link" id="mode-toggle-link">Create one</span>
+        </div>
+
         <p class="auth-helper">
           By signing in, you agree to the terms and understand this is
           <strong>not</strong> therapy or medical advice.
@@ -289,72 +382,215 @@
     </div>
 
     <script>
-      async function sendSecureLink(email, name) {
-        const res = await fetch("/auth/secure-link", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, name }),
-        });
+      // Auth mode: 'signin' or 'signup'
+      let authMode = 'signin'
+      let pendingEmail = null
 
-        if (!res.ok) {
-          let text = await res.text();
-          try {
-            const json = JSON.parse(text || "{}");
-            throw new Error(json.error || json.message || "Error sending link");
-          } catch {
-            throw new Error(text || "Error sending link");
-          }
+      const form = document.getElementById('auth-form')
+      const emailInput = document.getElementById('email')
+      const passwordInput = document.getElementById('password')
+      const nameInput = document.getElementById('name')
+      const nameGroup = document.getElementById('name-group')
+      const passwordGroup = document.getElementById('password-group')
+      const passwordHint = document.getElementById('password-hint')
+      const submitBtn = document.getElementById('submit-btn')
+      const statusEl = document.getElementById('auth-status')
+      const googleBtn = document.getElementById('google-btn')
+      const forgotLink = document.getElementById('forgot-link')
+      const resendLink = document.getElementById('resend-link')
+      const modeToggleLink = document.getElementById('mode-toggle-link')
+      const authSubtitle = document.getElementById('auth-subtitle')
+      const authHeading = document.getElementById('auth-heading')
+      const passwordToggle = document.getElementById('password-toggle')
+
+      function setAuthMode(mode) {
+        authMode = mode
+        statusEl.textContent = ''
+        statusEl.className = 'auth-status'
+        resendLink.style.display = 'none'
+
+        if (mode === 'signin') {
+          nameGroup.classList.add('hidden')
+          passwordHint.classList.add('hidden')
+          submitBtn.textContent = 'Sign In'
+          authSubtitle.textContent = 'Sign in'
+          forgotLink.style.display = 'inline'
+          modeToggleLink.textContent = 'Create one'
+          modeToggleLink.previousSibling.textContent = 'Need an account? '
+          passwordInput.autocomplete = 'current-password'
+        } else {
+          nameGroup.classList.remove('hidden')
+          passwordHint.classList.remove('hidden')
+          submitBtn.textContent = 'Create Account'
+          authSubtitle.textContent = 'Create account'
+          forgotLink.style.display = 'none'
+          modeToggleLink.textContent = 'Sign in'
+          modeToggleLink.previousSibling.textContent = 'Already have an account? '
+          passwordInput.autocomplete = 'new-password'
         }
-
-        return res.json();
       }
 
-      document.addEventListener("DOMContentLoaded", () => {
-        const form = document.getElementById("secure-link-form");
-        const emailInput = document.getElementById("email");
-        const nameInput = document.getElementById("name");
-        const submitBtn = document.getElementById("secure-link-submit");
-        const statusEl = document.getElementById("secure-link-status");
-        const googleBtn = document.getElementById("google-btn");
+      // Check for verification success message in URL
+      const urlParams = new URLSearchParams(window.location.search)
+      if (urlParams.get('verified') === 'true') {
+        statusEl.textContent = 'Email verified successfully! You can now sign in.'
+        statusEl.className = 'auth-status auth-status--ok'
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname)
+      }
 
-        if (form) {
-          form.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            if (!emailInput.value.trim()) {
-              emailInput.focus();
-              return;
-            }
+      // Password visibility toggle
+      passwordToggle.addEventListener('click', () => {
+        if (passwordInput.type === 'password') {
+          passwordInput.type = 'text'
+          passwordToggle.textContent = 'Hide'
+        } else {
+          passwordInput.type = 'password'
+          passwordToggle.textContent = 'Show'
+        }
+      })
 
-            submitBtn.disabled = true;
-            statusEl.textContent = "Sending Secure Link…";
-            statusEl.className = "auth-status";
+      // Mode toggle
+      modeToggleLink.addEventListener('click', () => {
+        setAuthMode(authMode === 'signin' ? 'signup' : 'signin')
+      })
 
-            try {
-              await sendSecureLink(emailInput.value.trim(), nameInput.value.trim());
-
-              statusEl.textContent =
-                "Secure Link sent. Please check your email to continue.";
-              statusEl.className = "auth-status auth-status--ok";
-            } catch (err) {
-              console.error("Secure Link error:", err);
-              statusEl.textContent =
-                err.message ||
-                "We couldn’t send your Secure Link. Please try again.";
-              statusEl.className = "auth-status auth-status--error";
-            } finally {
-              submitBtn.disabled = false;
-            }
-          });
+      // Forgot password
+      forgotLink.addEventListener('click', async () => {
+        const email = emailInput.value.trim()
+        if (!email) {
+          emailInput.focus()
+          statusEl.textContent = 'Please enter your email first.'
+          statusEl.className = 'auth-status auth-status--error'
+          return
         }
 
-        if (googleBtn) {
-          googleBtn.addEventListener("click", () => {
-            // Simple redirect to start Google OAuth
-            window.location.href = "/auth/google";
-          });
+        forgotLink.style.opacity = '0.5'
+        forgotLink.style.pointerEvents = 'none'
+
+        try {
+          const res = await fetch('/auth/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+          })
+
+          const data = await res.json()
+          statusEl.textContent = data.message || 'Check your email for reset instructions.'
+          statusEl.className = 'auth-status auth-status--ok'
+        } catch (err) {
+          statusEl.textContent = 'Failed to send reset email. Please try again.'
+          statusEl.className = 'auth-status auth-status--error'
+        } finally {
+          forgotLink.style.opacity = '1'
+          forgotLink.style.pointerEvents = 'auto'
         }
-      });
+      })
+
+      // Resend verification
+      resendLink.addEventListener('click', async () => {
+        if (!pendingEmail) return
+
+        resendLink.style.opacity = '0.5'
+        resendLink.style.pointerEvents = 'none'
+
+        try {
+          const res = await fetch('/auth/resend-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: pendingEmail })
+          })
+
+          const data = await res.json()
+          statusEl.textContent = data.message || 'Verification email sent.'
+          statusEl.className = 'auth-status auth-status--ok'
+        } catch (err) {
+          statusEl.textContent = 'Failed to resend. Please try again.'
+          statusEl.className = 'auth-status auth-status--error'
+        } finally {
+          resendLink.style.opacity = '1'
+          resendLink.style.pointerEvents = 'auto'
+        }
+      })
+
+      // Form submit
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault()
+
+        const email = emailInput.value.trim()
+        const password = passwordInput.value
+        const name = nameInput.value.trim()
+
+        if (!email) {
+          emailInput.focus()
+          return
+        }
+
+        if (!password) {
+          passwordInput.focus()
+          statusEl.textContent = 'Please enter your password.'
+          statusEl.className = 'auth-status auth-status--error'
+          return
+        }
+
+        submitBtn.disabled = true
+        statusEl.textContent = authMode === 'signin' ? 'Signing in...' : 'Creating account...'
+        statusEl.className = 'auth-status'
+
+        try {
+          const endpoint = authMode === 'signin' ? '/auth/login' : '/auth/register'
+          const body = authMode === 'signin'
+            ? { email, password }
+            : { email, password, name }
+
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          })
+
+          const data = await res.json()
+
+          if (!res.ok) {
+            statusEl.textContent = data.error || 'Something went wrong. Please try again.'
+            statusEl.className = 'auth-status auth-status--error'
+
+            // Show resend link if needs verification
+            if (data.needsVerification) {
+              pendingEmail = data.email || email
+              resendLink.style.display = 'inline'
+            }
+            return
+          }
+
+          if (authMode === 'signup') {
+            statusEl.textContent = data.message || 'Account created! Check your email to verify.'
+            statusEl.className = 'auth-status auth-status--ok'
+            // Switch to sign in mode
+            setTimeout(() => setAuthMode('signin'), 2000)
+          } else {
+            // Login successful - redirect
+            statusEl.textContent = 'Success! Redirecting...'
+            statusEl.className = 'auth-status auth-status--ok'
+            window.location.href = '/'
+          }
+        } catch (err) {
+          console.error('Auth error:', err)
+          statusEl.textContent = 'Something went wrong. Please try again.'
+          statusEl.className = 'auth-status auth-status--error'
+        } finally {
+          submitBtn.disabled = false
+        }
+      })
+
+      // Google OAuth
+      googleBtn.addEventListener('click', () => {
+        window.location.href = '/auth/google'
+      })
+
+      // Initialize
+      setAuthMode('signin')
     </script>
   </body>
 </html>

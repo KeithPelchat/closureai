@@ -72,6 +72,10 @@
   <script>
     const checkoutBtn = document.getElementById('checkout-btn');
 
+    // Capture referral code from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const referralCode = urlParams.get('ref');
+
     checkoutBtn.addEventListener('click', async () => {
       checkoutBtn.disabled = true;
       checkoutBtn.textContent = 'Redirecting to checkout...';
@@ -80,6 +84,7 @@
         const res = await fetch('/api/onboard/create-checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ referralCode: referralCode || null }),
         });
 
         const data = await res.json();

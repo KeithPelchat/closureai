@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Partner Dashboard - {{APP_NAME}}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+  <style>
+    /* Partner-specific overrides */
+    .admin-badge {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+    }
+
+    .admin-sidebar-brand-mark {
+      background: linear-gradient(135deg, #22c55e, #4ade80);
+    }
+
+    .admin-nav-item.active {
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      border-left-color: #22c55e;
+    }
+
+    .referral-link-box {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .referral-link-input {
+      flex: 1;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #e2e8f0;
+      font-family: ui-monospace, monospace;
+      font-size: 13px;
+    }
+
+    .referral-link-input:focus {
+      outline: none;
+      border-color: #22c55e;
+    }
+
+    .btn-copy {
+      padding: 12px 20px;
+      background: #22c55e;
+      color: #0f172a;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s ease;
+    }
+
+    .btn-copy:hover {
+      background: #16a34a;
+    }
+
+    .btn-copy.copied {
+      background: #0ea5e9;
+    }
+
+    .stat-card-money {
+      color: #22c55e;
+    }
+
+    .stat-card-money::before {
+      content: "$";
+    }
+
+    .payment-method-section {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 24px;
+    }
+
+    .payment-method-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .payment-method-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .payment-method-display {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .payment-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: rgba(148, 163, 184, 0.1);
+      border-radius: 8px;
+      font-size: 14px;
+      color: #94a3b8;
+    }
+
+    .payment-badge strong {
+      color: #e2e8f0;
+    }
+
+    .edit-payment-form {
+      display: none;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #334155;
+    }
+
+    .edit-payment-form.active {
+      display: block;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .form-group {
+      flex: 1;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+
+    .form-input, .form-select {
+      width: 100%;
+      padding: 10px 14px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 14px;
+    }
+
+    .form-input:focus, .form-select:focus {
+      outline: none;
+      border-color: #22c55e;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .status-badge.pending {
+      background: rgba(251, 191, 36, 0.15);
+      color: #fbbf24;
+    }
+
+    .status-badge.paid {
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
+    }
+
+    .status-badge.active {
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
+    }
+
+    .status-badge.pending_onboarding {
+      background: rgba(59, 130, 246, 0.15);
+      color: #3b82f6;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #64748b;
+    }
+
+    .empty-state-icon {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-state-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+
+    .commission-type {
+      text-transform: capitalize;
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-shell">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <a href="/partner/dashboard" class="admin-sidebar-brand">
+          <div class="admin-sidebar-brand-mark"></div>
+          <div>
+            <div class="admin-sidebar-title">{{APP_NAME}}</div>
+            <div class="admin-badge">Partner</div>
+          </div>
+        </a>
+      </div>
+
+      <nav class="admin-sidebar-nav">
+        <a href="/partner/dashboard" class="admin-nav-item active">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          Dashboard
+        </a>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <button onclick="logout()" class="admin-back-link" style="background: none; border: none; cursor: pointer; width: 100%; text-align: left;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Logout
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <header class="admin-header">
+        <h1 class="admin-header-title">Partner Dashboard</h1>
+        <div class="admin-header-actions">
+          <span class="admin-user-info" id="partner-name">Loading...</span>
+        </div>
+      </header>
+
+      <div class="admin-content">
+        <!-- Referral Link -->
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Your Referral Link</h2>
+          </div>
+          <div class="admin-card-body">
+            <p style="color: #94a3b8; font-size: 14px; margin-bottom: 16px;">
+              Share this link with coaches. When they sign up and pay, you earn 30% commission.
+            </p>
+            <div class="referral-link-box">
+              <input type="text" class="referral-link-input" id="referral-link" readonly />
+              <button class="btn-copy" id="copy-btn" onclick="copyReferralLink()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card">
+            <div class="stat-card-label">Total Referrals</div>
+            <div class="stat-card-value" id="stat-referrals">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Pending Earnings</div>
+            <div class="stat-card-value stat-card-money" id="stat-pending">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Paid Earnings</div>
+            <div class="stat-card-value stat-card-money" id="stat-paid">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Total Earnings</div>
+            <div class="stat-card-value stat-card-money" id="stat-total">-</div>
+          </div>
+        </div>
+
+        <!-- Referrals Table -->
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Referred Coaches</h2>
+          </div>
+          <div class="admin-card-body" id="referrals-table">
+            <div class="admin-loading">
+              <div class="admin-spinner"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Commissions Table -->
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Commissions</h2>
+          </div>
+          <div class="admin-card-body" id="commissions-table">
+            <div class="admin-loading">
+              <div class="admin-spinner"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment Method -->
+        <div class="payment-method-section">
+          <div class="payment-method-header">
+            <h3 class="payment-method-title">Payment Method</h3>
+            <button class="btn-admin btn-admin-secondary btn-admin-sm" onclick="toggleEditPayment()">Edit</button>
+          </div>
+          <div class="payment-method-display" id="payment-display">
+            <span class="payment-badge" id="payment-info">Loading...</span>
+          </div>
+          <form class="edit-payment-form" id="edit-payment-form" onsubmit="updatePaymentMethod(event)">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Payment Method</label>
+                <select class="form-select" id="payment-method-select">
+                  <option value="venmo">Venmo</option>
+                  <option value="paypal">PayPal</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Handle / Email</label>
+                <input type="text" class="form-input" id="payment-handle-input" placeholder="@username or email" />
+              </div>
+            </div>
+            <div style="display: flex; gap: 12px;">
+              <button type="submit" class="btn-admin btn-admin-primary btn-admin-sm">Save</button>
+              <button type="button" class="btn-admin btn-admin-secondary btn-admin-sm" onclick="toggleEditPayment()">Cancel</button>
+            </div>
+            <div id="payment-status" style="margin-top: 12px; font-size: 13px;"></div>
+          </form>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/admin.js"></script>
+  <script>
+    let partnerStats = null;
+
+    // Load partner profile
+    async function loadProfile() {
+      try {
+        const res = await fetch("/api/partner/profile", { credentials: "include" });
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById("partner-name").textContent = data.data.name || data.data.email;
+        }
+      } catch (err) {
+        console.error("Failed to load profile:", err);
+      }
+    }
+
+    // Load stats
+    async function loadStats() {
+      try {
+        const res = await fetch("/api/partner/stats", { credentials: "include" });
+        const data = await res.json();
+        if (data.ok) {
+          partnerStats = data.data;
+
+          // Update referral link
+          const baseUrl = window.location.origin.replace("www.", "");
+          document.getElementById("referral-link").value =
+            `${baseUrl}/onboard?ref=${data.data.referralCode}`;
+
+          // Update stats
+          document.getElementById("stat-referrals").textContent = data.data.totalReferrals;
+          document.getElementById("stat-pending").textContent = formatMoney(data.data.pendingEarnings);
+          document.getElementById("stat-paid").textContent = formatMoney(data.data.paidEarnings);
+          document.getElementById("stat-total").textContent = formatMoney(data.data.totalEarnings);
+
+          // Update payment info
+          updatePaymentDisplay(data.data.paymentMethod, data.data.paymentHandle);
+        }
+      } catch (err) {
+        console.error("Failed to load stats:", err);
+      }
+    }
+
+    // Format money
+    function formatMoney(amount) {
+      return amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // Update payment display
+    function updatePaymentDisplay(method, handle) {
+      const el = document.getElementById("payment-info");
+      if (method && handle) {
+        const methodLabel = method.charAt(0).toUpperCase() + method.slice(1);
+        el.innerHTML = `<strong>${methodLabel}:</strong> ${escapeHtml(handle)}`;
+      } else {
+        el.textContent = "Not set - click Edit to add";
+      }
+
+      // Pre-fill form
+      document.getElementById("payment-method-select").value = method || "venmo";
+      document.getElementById("payment-handle-input").value = handle || "";
+    }
+
+    // Load referrals
+    async function loadReferrals() {
+      const container = document.getElementById("referrals-table");
+      try {
+        const res = await fetch("/api/partner/referrals", { credentials: "include" });
+        const data = await res.json();
+
+        if (!data.ok || !data.data || data.data.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              <div class="empty-state-title">No referrals yet</div>
+              <p>Share your referral link to start earning commissions.</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = `
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Coach</th>
+                <th>App Name</th>
+                <th>Status</th>
+                <th>Joined</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.data.map(r => `
+                <tr>
+                  <td>${escapeHtml(r.coachEmail || "N/A")}</td>
+                  <td>${escapeHtml(r.appName || "N/A")}</td>
+                  <td><span class="status-badge ${r.status}">${formatStatus(r.status)}</span></td>
+                  <td>${formatRelativeTime(r.createdAt)}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      } catch (err) {
+        console.error("Failed to load referrals:", err);
+        container.innerHTML = '<p style="color: #64748b; text-align: center;">Failed to load referrals</p>';
+      }
+    }
+
+    // Load commissions
+    async function loadCommissions() {
+      const container = document.getElementById("commissions-table");
+      try {
+        const res = await fetch("/api/partner/commissions", { credentials: "include" });
+        const data = await res.json();
+
+        if (!data.ok || !data.data || data.data.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/>
+                <path d="M12 18V6"/>
+              </svg>
+              <div class="empty-state-title">No commissions yet</div>
+              <p>Commissions will appear here when referred coaches make payments.</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = `
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Coach</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.data.map(c => `
+                <tr>
+                  <td>${escapeHtml(c.appName || "N/A")}</td>
+                  <td class="commission-type">${c.type.replace("_", " ")}</td>
+                  <td style="color: #22c55e; font-weight: 600;">$${c.amount.toFixed(2)}</td>
+                  <td><span class="status-badge ${c.status}">${c.status}</span></td>
+                  <td>${formatRelativeTime(c.createdAt)}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      } catch (err) {
+        console.error("Failed to load commissions:", err);
+        container.innerHTML = '<p style="color: #64748b; text-align: center;">Failed to load commissions</p>';
+      }
+    }
+
+    // Format status
+    function formatStatus(status) {
+      const statusMap = {
+        "active": "Active",
+        "pending_onboarding": "Pending",
+        "suspended": "Suspended",
+      };
+      return statusMap[status] || status;
+    }
+
+    // Copy referral link
+    function copyReferralLink() {
+      const input = document.getElementById("referral-link");
+      const btn = document.getElementById("copy-btn");
+
+      navigator.clipboard.writeText(input.value).then(() => {
+        btn.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Copied!
+        `;
+        btn.classList.add("copied");
+
+        setTimeout(() => {
+          btn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy
+          `;
+          btn.classList.remove("copied");
+        }, 2000);
+      });
+    }
+
+    // Toggle edit payment form
+    function toggleEditPayment() {
+      const form = document.getElementById("edit-payment-form");
+      form.classList.toggle("active");
+      document.getElementById("payment-status").textContent = "";
+    }
+
+    // Update payment method
+    async function updatePaymentMethod(e) {
+      e.preventDefault();
+      const statusEl = document.getElementById("payment-status");
+      const method = document.getElementById("payment-method-select").value;
+      const handle = document.getElementById("payment-handle-input").value.trim();
+
+      if (!handle) {
+        statusEl.textContent = "Please enter a handle or email";
+        statusEl.style.color = "#ef4444";
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/partner/payment-method", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ paymentMethod: method, paymentHandle: handle })
+        });
+
+        const data = await res.json();
+
+        if (data.ok) {
+          statusEl.textContent = "Payment method updated!";
+          statusEl.style.color = "#22c55e";
+          updatePaymentDisplay(method, handle);
+          setTimeout(() => toggleEditPayment(), 1500);
+        } else {
+          statusEl.textContent = data.error || "Failed to update";
+          statusEl.style.color = "#ef4444";
+        }
+      } catch (err) {
+        console.error("Failed to update payment method:", err);
+        statusEl.textContent = "Failed to update payment method";
+        statusEl.style.color = "#ef4444";
+      }
+    }
+
+    // Logout
+    async function logout() {
+      try {
+        await fetch("/partner/logout", { method: "POST", credentials: "include" });
+        window.location.href = "/partners";
+      } catch (err) {
+        console.error("Logout failed:", err);
+      }
+    }
+
+    // Escape HTML
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    // Format relative time
+    function formatRelativeTime(dateStr) {
+      if (!dateStr) return "-";
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return "Just now";
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString();
+    }
+
+    // Initialize
+    loadProfile();
+    loadStats();
+    loadReferrals();
+    loadCommissions();
+  </script>
+</body>
+</html>

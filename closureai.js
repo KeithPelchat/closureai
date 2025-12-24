@@ -16,7 +16,8 @@ const STRIPE_CONFIG = require("./config/stripeConfig");
 const UI_CONFIG = require("./config/uiConfig");
 
 const db = require("./db");
-const { sendMagicLinkEmail } = require("./email/sesEmail");
+const { sendMagicLinkEmail, sendVerificationEmail, sendPasswordResetEmail } = require("./email/sesEmail");
+const bcrypt = require("bcryptjs");
 
 const stripe = require("stripe")(STRIPE_CONFIG.secretKey || "");
 if (!STRIPE_CONFIG.secretKey) {
@@ -163,6 +164,64 @@ app.post(
             } catch (invoiceErr) {
               console.error("❌ Failed to add setup fee invoice item:", invoiceErr.message);
             }
+          }
+          break;
+        }
+        case "invoice.payment_succeeded": {
+          // Create monthly commission for partner referrals
+          const invoice = event.data.object;
+
+          // Only process subscription invoices (not one-time charges)
+          if (!invoice.subscription) {
+            break;
+          }
+
+          // Skip if this is the first invoice (setup fee is handled separately)
+          if (invoice.billing_reason === "subscription_create") {
+            console.log("ℹ️ Skipping commission for initial subscription invoice (handled by checkout)");
+            break;
+          }
+
+          console.log("✅ Stripe: invoice.payment_succeeded for subscription:", invoice.subscription);
+
+          try {
+            // Find the app by Stripe customer ID
+            const appResult = await db.query(
+              `SELECT a.id, a.partner_id, p.commission_percent
+               FROM apps a
+               LEFT JOIN partners p ON a.partner_id = p.id
+               WHERE a.stripe_customer_id = $1`,
+              [invoice.customer]
+            );
+
+            if (appResult.rows.length === 0) {
+              console.log("ℹ️ No app found for customer:", invoice.customer);
+              break;
+            }
+
+            const app = appResult.rows[0];
+
+            // Check if this app has a partner referral
+            if (!app.partner_id) {
+              console.log("ℹ️ No partner referral for app:", app.id);
+              break;
+            }
+
+            // Calculate monthly commission (30% of $97 = $29.10 by default)
+            const monthlyFee = 97; // $97/month
+            const commissionPercent = parseFloat(app.commission_percent) || 30;
+            const commissionAmount = (monthlyFee * commissionPercent) / 100;
+
+            // Create the monthly commission
+            await db.query(
+              `INSERT INTO commissions (partner_id, client_id, type, amount, status)
+               VALUES ($1, $2, 'monthly', $3, 'pending')`,
+              [app.partner_id, app.id, commissionAmount]
+            );
+
+            console.log(`✅ Created monthly commission: $${commissionAmount.toFixed(2)} for partner ${app.partner_id} (app ${app.id})`);
+          } catch (err) {
+            console.error("❌ Error creating monthly commission:", err);
           }
           break;
         }
@@ -402,6 +461,93 @@ async function createMagicLink(userId) {
   const loginUrl = `${baseUrl}${loginPath}`;
 
   return loginUrl;
+}
+
+// ---------------------------------------------------------------------
+// Password Auth Helper Functions
+// ---------------------------------------------------------------------
+
+/**
+ * Validate password meets requirements:
+ * - Min 8 characters
+ * - At least 1 uppercase letter
+ * - At least 1 number
+ */
+function validatePassword(password) {
+  if (!password || password.length < 8) {
+    return { valid: false, error: 'Password must be at least 8 characters' }
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, error: 'Password must contain at least one uppercase letter' }
+  }
+  if (!/\d/.test(password)) {
+    return { valid: false, error: 'Password must contain at least one number' }
+  }
+  return { valid: true }
+}
+
+async function hashPassword(password) {
+  return bcrypt.hash(password, 12)
+}
+
+async function verifyPassword(password, hash) {
+  return bcrypt.compare(password, hash)
+}
+
+/**
+ * Create email verification token
+ */
+async function createEmailVerificationToken(userType, userId) {
+  const token = crypto.randomBytes(32).toString('hex')
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h
+
+  await db.query(
+    `INSERT INTO email_verification_tokens (user_type, user_id, token, expires_at)
+     VALUES ($1, $2, $3, $4)`,
+    [userType, userId, token, expires]
+  )
+
+  return token
+}
+
+/**
+ * Create password reset token
+ */
+async function createPasswordResetToken(userType, userId) {
+  const token = crypto.randomBytes(32).toString('hex')
+  const expires = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+
+  // Invalidate any existing tokens for this user
+  await db.query(
+    `UPDATE password_reset_tokens
+     SET used_at = NOW()
+     WHERE user_type = $1 AND user_id = $2 AND used_at IS NULL`,
+    [userType, userId]
+  )
+
+  await db.query(
+    `INSERT INTO password_reset_tokens (user_type, user_id, token, expires_at)
+     VALUES ($1, $2, $3, $4)`,
+    [userType, userId, token, expires]
+  )
+
+  return token
+}
+
+/**
+ * Get base URL for the current request context
+ */
+function getBaseUrl(req) {
+  const hostname = req.hostname || req.get('host')?.split(':')[0] || ''
+  const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http'
+
+  // If we have a tenant with a base URL, use that
+  if (req.tenant?.base_url) {
+    return req.tenant.base_url
+  }
+
+  // Otherwise construct from request
+  return `${protocol}://${hostname}`
 }
 
 async function getOffersForApp(appId, options = {}) {
@@ -734,6 +880,73 @@ async function requireAdmin(req, res, next) {
 }
 
 // ---------------------------------------------------------------------
+// Partner auth middleware
+// ---------------------------------------------------------------------
+
+async function requirePartnerAuth(req, res, next) {
+  const token = req.cookies.closureai_partner_auth;
+
+  if (!token) {
+    if (wantsJsonResponse(req)) {
+      return res.status(401).json({
+        ok: false,
+        code: "UNAUTHORIZED",
+        message: "Not authenticated",
+      });
+    }
+    return res.redirect("/partners");
+  }
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+
+    const result = await db.query("SELECT * FROM partners WHERE id = $1", [
+      payload.partnerId,
+    ]);
+
+    if (result.rows.length === 0) {
+      res.clearCookie("closureai_partner_auth");
+      if (wantsJsonResponse(req)) {
+        return res.status(401).json({
+          ok: false,
+          code: "UNAUTHORIZED",
+          message: "Partner not found",
+        });
+      }
+      return res.redirect("/partners");
+    }
+
+    const partner = result.rows[0];
+
+    // Check if partner is active
+    if (partner.status !== "active") {
+      if (wantsJsonResponse(req)) {
+        return res.status(403).json({
+          ok: false,
+          code: "PARTNER_INACTIVE",
+          message: "Your partner account is not active",
+        });
+      }
+      return res.redirect("/partners");
+    }
+
+    req.partner = partner;
+    return next();
+  } catch (err) {
+    console.error("requirePartnerAuth error:", err);
+    res.clearCookie("closureai_partner_auth");
+    if (wantsJsonResponse(req)) {
+      return res.status(401).json({
+        ok: false,
+        code: "UNAUTHORIZED",
+        message: "Authentication error",
+      });
+    }
+    return res.redirect("/partners");
+  }
+}
+
+// ---------------------------------------------------------------------
 // Stripe helpers
 // ---------------------------------------------------------------------
 
@@ -799,8 +1012,12 @@ async function handleCoachPlatformCheckout(session) {
   const customerId = session.customer;
   const subscriptionId = session.subscription;
   const customerEmail = session.customer_details?.email || session.customer_email;
+  const referralCode = session.metadata?.referral_code;
 
   console.log(`[Coach Platform] Processing checkout for customer: ${customerId}`);
+  if (referralCode) {
+    console.log(`[Coach Platform] Referral code: ${referralCode}`);
+  }
 
   // Generate a unique onboarding token
   const onboardingToken = crypto.randomBytes(32).toString("hex");
@@ -808,6 +1025,28 @@ async function handleCoachPlatformCheckout(session) {
 
   // Generate a unique slug for the new app
   const slug = `coach-${crypto.randomBytes(4).toString("hex")}`;
+
+  // Look up partner by referral code if provided
+  let partnerId = null;
+  let partnerCommissionPercent = 30; // Default 30%
+  if (referralCode) {
+    try {
+      const partnerResult = await db.query(
+        `SELECT id, commission_percent FROM partners
+         WHERE referral_code = $1 AND status = 'active'`,
+        [referralCode]
+      );
+      if (partnerResult.rows.length > 0) {
+        partnerId = partnerResult.rows[0].id;
+        partnerCommissionPercent = parseFloat(partnerResult.rows[0].commission_percent);
+        console.log(`[Coach Platform] Found partner: ${partnerId} with commission ${partnerCommissionPercent}%`);
+      } else {
+        console.log(`[Coach Platform] No active partner found for referral code: ${referralCode}`);
+      }
+    } catch (err) {
+      console.error("[Coach Platform] Error looking up partner:", err);
+    }
+  }
 
   try {
     // Create a new app record
@@ -817,8 +1056,8 @@ async function handleCoachPlatformCheckout(session) {
     const result = await db.query(
       `INSERT INTO apps (
         slug, name, base_url, coach_email, stripe_customer_id, stripe_subscription_id,
-        status, setup_paid_at, onboarding_token, onboarding_token_expires_at, subdomain
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9, $10)
+        status, setup_paid_at, onboarding_token, onboarding_token_expires_at, subdomain, partner_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9, $10, $11)
       RETURNING id, slug`,
       [
         slug,
@@ -831,11 +1070,27 @@ async function handleCoachPlatformCheckout(session) {
         onboardingToken,
         onboardingTokenExpiresAt,
         slug, // Use slug as subdomain initially
+        partnerId,
       ]
     );
 
-    console.log(`[Coach Platform] Created app ${result.rows[0].slug} with id ${result.rows[0].id}`);
+    const appId = result.rows[0].id;
+    console.log(`[Coach Platform] Created app ${result.rows[0].slug} with id ${appId}`);
     console.log(`[Coach Platform] Onboarding token: ${onboardingToken}`);
+
+    // Create setup fee commission if referred by a partner
+    if (partnerId) {
+      const setupFee = 2495; // $2,495 setup fee
+      const commissionAmount = (setupFee * partnerCommissionPercent) / 100;
+
+      await db.query(
+        `INSERT INTO commissions (partner_id, client_id, type, amount, status)
+         VALUES ($1, $2, 'setup_fee', $3, 'pending')`,
+        [partnerId, appId, commissionAmount]
+      );
+
+      console.log(`[Coach Platform] Created setup_fee commission: $${commissionAmount.toFixed(2)} for partner ${partnerId}`);
+    }
 
     // TODO: Send welcome email with onboarding link
     // For now, the user will get redirected to /onboard/form?token=CHECKOUT_SESSION_ID
@@ -858,7 +1113,197 @@ app.get("/health", (req, res) => {
 
 // Static informational pages
 app.get("/partners", (req, res) => {
+  // If already logged in as partner, redirect to dashboard
+  const token = req.cookies.closureai_partner_auth;
+  if (token) {
+    try {
+      jwt.verify(token, JWT_SECRET);
+      return res.redirect("/partner/dashboard");
+    } catch (e) {
+      // Invalid token, continue to show partners page
+    }
+  }
   return res.sendFile(path.join(__dirname, "views", "partners.html"));
+});
+
+// Partner dashboard page
+app.get("/partner/dashboard", requirePartnerAuth, (req, res) => {
+  const filePath = path.join(__dirname, "views", "partner", "dashboard.html");
+  renderHtmlTemplate(res, filePath, {}, req.tenant);
+});
+
+// Partner logout
+app.post("/partner/logout", (req, res) => {
+  res.clearCookie("closureai_partner_auth");
+  return res.json({ ok: true, redirectTo: "/partners" });
+});
+
+// Partner API: Get stats (referrals, earnings)
+app.get("/api/partner/stats", requirePartnerAuth, async (req, res) => {
+  try {
+    const partnerId = req.partner.id;
+
+    // Get referral count
+    const referralsResult = await db.query(
+      "SELECT COUNT(*) FROM apps WHERE partner_id = $1",
+      [partnerId]
+    );
+    const totalReferrals = parseInt(referralsResult.rows[0].count, 10);
+
+    // Get commission stats
+    const commissionsResult = await db.query(
+      `SELECT
+        COALESCE(SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END), 0) as pending,
+        COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as paid,
+        COALESCE(SUM(amount), 0) as total
+      FROM commissions WHERE partner_id = $1`,
+      [partnerId]
+    );
+    const { pending, paid, total } = commissionsResult.rows[0];
+
+    return res.json({
+      ok: true,
+      data: {
+        referralCode: req.partner.referral_code,
+        totalReferrals,
+        pendingEarnings: parseFloat(pending),
+        paidEarnings: parseFloat(paid),
+        totalEarnings: parseFloat(total),
+        paymentMethod: req.partner.payment_method,
+        paymentHandle: req.partner.payment_handle,
+      },
+    });
+  } catch (err) {
+    console.error("Error in /api/partner/stats:", err);
+    return res.status(500).json({ error: "Failed to fetch stats" });
+  }
+});
+
+// Partner API: Get referrals list
+app.get("/api/partner/referrals", requirePartnerAuth, async (req, res) => {
+  try {
+    const partnerId = req.partner.id;
+
+    const result = await db.query(
+      `SELECT
+        a.id,
+        a.name,
+        a.subdomain,
+        a.status,
+        a.created_at,
+        a.coach_email
+      FROM apps a
+      WHERE a.partner_id = $1
+      ORDER BY a.created_at DESC`,
+      [partnerId]
+    );
+
+    return res.json({
+      ok: true,
+      data: result.rows.map((r) => ({
+        id: r.id,
+        appName: r.name,
+        subdomain: r.subdomain,
+        status: r.status,
+        coachEmail: r.coach_email,
+        createdAt: r.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error("Error in /api/partner/referrals:", err);
+    return res.status(500).json({ error: "Failed to fetch referrals" });
+  }
+});
+
+// Partner API: Get commissions list
+app.get("/api/partner/commissions", requirePartnerAuth, async (req, res) => {
+  try {
+    const partnerId = req.partner.id;
+
+    const result = await db.query(
+      `SELECT
+        c.id,
+        c.type,
+        c.amount,
+        c.status,
+        c.paid_at,
+        c.created_at,
+        a.name as app_name
+      FROM commissions c
+      LEFT JOIN apps a ON a.id = c.client_id
+      WHERE c.partner_id = $1
+      ORDER BY c.created_at DESC`,
+      [partnerId]
+    );
+
+    return res.json({
+      ok: true,
+      data: result.rows.map((r) => ({
+        id: r.id,
+        type: r.type,
+        amount: parseFloat(r.amount),
+        status: r.status,
+        paidAt: r.paid_at,
+        createdAt: r.created_at,
+        appName: r.app_name,
+      })),
+    });
+  } catch (err) {
+    console.error("Error in /api/partner/commissions:", err);
+    return res.status(500).json({ error: "Failed to fetch commissions" });
+  }
+});
+
+// Partner API: Update payment method
+app.put("/api/partner/payment-method", requirePartnerAuth, async (req, res) => {
+  try {
+    const partnerId = req.partner.id;
+    const { paymentMethod, paymentHandle } = req.body || {};
+
+    if (!paymentMethod || !["venmo", "paypal"].includes(paymentMethod)) {
+      return res.status(400).json({ error: "Invalid payment method" });
+    }
+
+    if (!paymentHandle || paymentHandle.trim().length < 2) {
+      return res.status(400).json({ error: "Payment handle is required" });
+    }
+
+    await db.query(
+      `UPDATE partners
+        SET payment_method = $1, payment_handle = $2, updated_at = NOW()
+        WHERE id = $3`,
+      [paymentMethod, paymentHandle.trim(), partnerId]
+    );
+
+    return res.json({ ok: true, message: "Payment method updated" });
+  } catch (err) {
+    console.error("Error in /api/partner/payment-method:", err);
+    return res.status(500).json({ error: "Failed to update payment method" });
+  }
+});
+
+// Partner API: Get profile
+app.get("/api/partner/profile", requirePartnerAuth, async (req, res) => {
+  try {
+    const partner = req.partner;
+    return res.json({
+      ok: true,
+      data: {
+        id: partner.id,
+        name: partner.name,
+        email: partner.email,
+        referralCode: partner.referral_code,
+        commissionPercent: parseFloat(partner.commission_percent),
+        paymentMethod: partner.payment_method,
+        paymentHandle: partner.payment_handle,
+        status: partner.status,
+        createdAt: partner.created_at,
+      },
+    });
+  } catch (err) {
+    console.error("Error in /api/partner/profile:", err);
+    return res.status(500).json({ error: "Failed to fetch profile" });
+  }
 });
 
 app.get("/terms", (req, res) => {
@@ -924,7 +1369,7 @@ app.get("/auth/status", async (req, res) => {
   }
 });
 
-// Request a one-time Secure Link by email
+// Request a one-time Secure Link by email (legacy - kept for backward compat)
 app.post("/auth/secure-link", async (req, res) => {
   try {
     const { email, name } = req.body || {};
@@ -958,11 +1403,698 @@ app.post("/auth/secure-link", async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------
+// Email/Password Authentication Routes
+// ---------------------------------------------------------------------
+
+// User Registration
+app.post("/auth/register", async (req, res) => {
+  try {
+    const { email, password, name } = req.body || {}
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' })
+    }
+
+    const validation = validatePassword(password)
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error })
+    }
+
+    const normalizedEmail = normalizeEmail(email)
+    const appId = req.tenant?.id || APP_ID
+
+    // Check if user already exists
+    const existing = await db.query(
+      'SELECT id, password_hash, email_verified FROM users WHERE app_id = $1 AND email = $2',
+      [appId, normalizedEmail]
+    )
+
+    if (existing.rows.length > 0) {
+      const existingUser = existing.rows[0]
+
+      if (existingUser.password_hash) {
+        return res.status(400).json({ error: 'An account with this email already exists. Please sign in.' })
+      }
+
+      // User exists but no password (e.g., from magic link or Google) - set password
+      const passwordHash = await hashPassword(password)
+      await db.query(
+        `UPDATE users SET password_hash = $1, name = COALESCE($2, name), updated_at = NOW()
+         WHERE id = $3`,
+        [passwordHash, name, existingUser.id]
+      )
+
+      // Send verification email if not already verified
+      if (!existingUser.email_verified) {
+        const verifyToken = await createEmailVerificationToken('user', existingUser.id)
+        const baseUrl = getBaseUrl(req)
+        const verifyUrl = `${baseUrl}/auth/verify/${verifyToken}`
+
+        await sendVerificationEmail({ to: normalizedEmail, name, verifyUrl })
+        return res.json({ ok: true, message: 'Password set. Please check your email to verify your account.' })
+      }
+
+      return res.json({ ok: true, message: 'Password set. You can now sign in.' })
+    }
+
+    // Create new user
+    const passwordHash = await hashPassword(password)
+    const result = await db.query(
+      `INSERT INTO users (email, name, password_hash, app_id, email_verified, status)
+       VALUES ($1, $2, $3, $4, false, 'active')
+       RETURNING id`,
+      [normalizedEmail, name || null, passwordHash, appId]
+    )
+
+    const verifyToken = await createEmailVerificationToken('user', result.rows[0].id)
+    const baseUrl = getBaseUrl(req)
+    const verifyUrl = `${baseUrl}/auth/verify/${verifyToken}`
+
+    await sendVerificationEmail({ to: normalizedEmail, name, verifyUrl })
+
+    return res.json({ ok: true, message: 'Account created. Please check your email to verify.' })
+  } catch (err) {
+    console.error('Error in /auth/register:', err)
+    return res.status(500).json({ error: 'Registration failed. Please try again.' })
+  }
+})
+
+// User Login
+app.post("/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body || {}
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' })
+    }
+
+    const normalizedEmail = normalizeEmail(email)
+    const appId = req.tenant?.id || APP_ID
+
+    const result = await db.query(
+      'SELECT id, password_hash, email_verified, name, status FROM users WHERE app_id = $1 AND email = $2',
+      [appId, normalizedEmail]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid email or password' })
+    }
+
+    const user = result.rows[0]
+
+    if (!user.password_hash) {
+      return res.status(401).json({
+        error: 'This account was created with Google. Please use "Continue with Google" to sign in.'
+      })
+    }
+
+    if (user.status === 'inactive') {
+      return res.status(403).json({ error: 'This account has been deactivated.' })
+    }
+
+    const valid = await verifyPassword(password, user.password_hash)
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid email or password' })
+    }
+
+    if (!user.email_verified) {
+      return res.status(403).json({
+        error: 'Please verify your email before signing in. Check your inbox for the verification link.',
+        needsVerification: true,
+        email: normalizedEmail
+      })
+    }
+
+    const jwtToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' })
+
+    const hostname = req.hostname || req.get('host')?.split(':')[0] || ''
+    const cookieOptions = {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000
+    }
+
+    if (hostname.endsWith('.getclosureai.com')) {
+      cookieOptions.domain = '.getclosureai.com'
+    }
+
+    res.cookie('closureai_auth', jwtToken, cookieOptions)
+
+    return res.json({ ok: true, user: { id: user.id, name: user.name } })
+  } catch (err) {
+    console.error('Error in /auth/login:', err)
+    return res.status(500).json({ error: 'Login failed. Please try again.' })
+  }
+})
+
+// Email Verification
+app.get("/auth/verify/:token", async (req, res) => {
+  try {
+    const { token } = req.params
+
+    const result = await db.query(
+      `SELECT * FROM email_verification_tokens
+       WHERE token = $1 AND used_at IS NULL AND expires_at > NOW()`,
+      [token]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(400).send(`
+        <!doctype html>
+        <html>
+          <head><title>Verification Failed</title></head>
+          <body style="font-family: system-ui; text-align: center; padding: 50px;">
+            <h1>Invalid or Expired Link</h1>
+            <p>This verification link is invalid or has expired.</p>
+            <p><a href="/login">Return to login</a></p>
+          </body>
+        </html>
+      `)
+    }
+
+    const { user_type, user_id } = result.rows[0]
+
+    // Mark token as used
+    await db.query(
+      'UPDATE email_verification_tokens SET used_at = NOW() WHERE token = $1',
+      [token]
+    )
+
+    // Update user's email_verified status
+    const table = user_type === 'client' ? 'apps' : user_type === 'partner' ? 'partners' : 'users'
+    await db.query(
+      `UPDATE ${table} SET email_verified = true, updated_at = NOW() WHERE id = $1`,
+      [user_id]
+    )
+
+    // Redirect to login with success message
+    return res.redirect('/login?verified=true')
+  } catch (err) {
+    console.error('Error in /auth/verify/:token:', err)
+    return res.status(500).send('Verification failed. Please try again.')
+  }
+})
+
+// Resend Verification Email
+app.post("/auth/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body || {}
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' })
+    }
+
+    const normalizedEmail = normalizeEmail(email)
+    const appId = req.tenant?.id || APP_ID
+
+    const result = await db.query(
+      'SELECT id, name, email_verified FROM users WHERE app_id = $1 AND email = $2',
+      [appId, normalizedEmail]
+    )
+
+    // Always return success to prevent email enumeration
+    if (result.rows.length === 0) {
+      return res.json({ ok: true, message: 'If an account exists, a verification email has been sent.' })
+    }
+
+    const user = result.rows[0]
+
+    if (user.email_verified) {
+      return res.json({ ok: true, message: 'Email is already verified. You can sign in.' })
+    }
+
+    const verifyToken = await createEmailVerificationToken('user', user.id)
+    const baseUrl = getBaseUrl(req)
+    const verifyUrl = `${baseUrl}/auth/verify/${verifyToken}`
+
+    await sendVerificationEmail({ to: normalizedEmail, name: user.name, verifyUrl })
+
+    return res.json({ ok: true, message: 'Verification email sent. Please check your inbox.' })
+  } catch (err) {
+    console.error('Error in /auth/resend-verification:', err)
+    return res.status(500).json({ error: 'Failed to send verification email.' })
+  }
+})
+
+// Forgot Password
+app.post("/auth/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body || {}
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' })
+    }
+
+    const normalizedEmail = normalizeEmail(email)
+    const appId = req.tenant?.id || APP_ID
+
+    const result = await db.query(
+      'SELECT id, name FROM users WHERE app_id = $1 AND email = $2',
+      [appId, normalizedEmail]
+    )
+
+    // Always return success to prevent email enumeration
+    if (result.rows.length === 0) {
+      return res.json({ ok: true, message: 'If an account exists, a reset link has been sent.' })
+    }
+
+    const user = result.rows[0]
+    const resetToken = await createPasswordResetToken('user', user.id)
+    const baseUrl = getBaseUrl(req)
+    const resetUrl = `${baseUrl}/auth/reset-password/${resetToken}`
+
+    await sendPasswordResetEmail({ to: normalizedEmail, name: user.name, resetUrl })
+
+    return res.json({ ok: true, message: 'If an account exists, a reset link has been sent.' })
+  } catch (err) {
+    console.error('Error in /auth/forgot-password:', err)
+    return res.status(500).json({ error: 'Failed to process request.' })
+  }
+})
+
+// Show Reset Password Form
+app.get("/auth/reset-password/:token", async (req, res) => {
+  try {
+    const { token } = req.params
+
+    const result = await db.query(
+      `SELECT * FROM password_reset_tokens
+       WHERE token = $1 AND used_at IS NULL AND expires_at > NOW()`,
+      [token]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(400).send(`
+        <!doctype html>
+        <html>
+          <head><title>Link Expired</title></head>
+          <body style="font-family: system-ui; text-align: center; padding: 50px;">
+            <h1>Invalid or Expired Link</h1>
+            <p>This password reset link is invalid or has expired.</p>
+            <p><a href="/login">Return to login</a> to request a new one.</p>
+          </body>
+        </html>
+      `)
+    }
+
+    // Render reset password form
+    const filePath = path.join(__dirname, 'public', 'reset-password.html')
+    renderHtmlTemplate(res, filePath, { RESET_TOKEN: token }, req.tenant)
+  } catch (err) {
+    console.error('Error in GET /auth/reset-password/:token:', err)
+    return res.status(500).send('Error loading reset form.')
+  }
+})
+
+// Process Password Reset
+app.post("/auth/reset-password", async (req, res) => {
+  try {
+    const { token, password } = req.body || {}
+
+    if (!token || !password) {
+      return res.status(400).json({ error: 'Token and password are required' })
+    }
+
+    const validation = validatePassword(password)
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error })
+    }
+
+    const result = await db.query(
+      `SELECT * FROM password_reset_tokens
+       WHERE token = $1 AND used_at IS NULL AND expires_at > NOW()`,
+      [token]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired reset link. Please request a new one.' })
+    }
+
+    const { user_type, user_id } = result.rows[0]
+
+    // Hash new password
+    const passwordHash = await hashPassword(password)
+
+    // Update password and mark email as verified
+    const table = user_type === 'client' ? 'apps' : user_type === 'partner' ? 'partners' : 'users'
+    await db.query(
+      `UPDATE ${table} SET password_hash = $1, email_verified = true, updated_at = NOW() WHERE id = $2`,
+      [passwordHash, user_id]
+    )
+
+    // Mark token as used
+    await db.query(
+      'UPDATE password_reset_tokens SET used_at = NOW() WHERE token = $1',
+      [token]
+    )
+
+    return res.json({ ok: true, message: 'Password reset successfully. You can now sign in.' })
+  } catch (err) {
+    console.error('Error in POST /auth/reset-password:', err)
+    return res.status(500).json({ error: 'Failed to reset password.' })
+  }
+})
+
 // Logout: clear cookie
 app.post("/auth/logout", (req, res) => {
   res.clearCookie("closureai_auth");
+  res.clearCookie("closureai_client_auth");
+  res.clearCookie("closureai_partner_auth");
   return res.json({ ok: true });
 });
+
+// ---------------------------------------------------------------------
+// Client (Coach) Authentication Routes
+// ---------------------------------------------------------------------
+
+// Client Login
+app.post("/auth/client/login", async (req, res) => {
+  try {
+    const { email, password } = req.body || {}
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' })
+    }
+
+    const normalizedEmail = normalizeEmail(email)
+
+    const result = await db.query(
+      'SELECT id, password_hash, email_verified, coach_name, status FROM apps WHERE coach_email = $1',
+      [normalizedEmail]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid email or password' })
+    }
+
+    const client = result.rows[0]
+
+    if (!client.password_hash) {
+      return res.status(401).json({
+        error: 'Please complete your account setup or use Google to sign in.'
+      })
+    }
+
+    if (client.status === 'suspended' || client.status === 'cancelled') {
+      return res.status(403).json({ error: 'This account has been suspended.' })
+    }
+
+    const valid = await verifyPassword(password, client.password_hash)
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid email or password' })
+    }
+
+    if (!client.email_verified) {
+      return res.status(403).json({
+        error: 'Please verify your email before signing in.',
+        needsVerification: true,
+        email: normalizedEmail
+      })
+    }
+
+    const jwtToken = jwt.sign({ clientId: client.id }, JWT_SECRET, { expiresIn: '30d' })
+
+    res.cookie('closureai_client_auth', jwtToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000
+    })
+
+    return res.json({ ok: true, redirectTo: '/platform/dashboard' })
+  } catch (err) {
+    console.error('Error in /auth/client/login:', err)
+    return res.status(500).json({ error: 'Login failed. Please try again.' })
+  }
+})
+
+// Client Forgot Password
+app.post("/auth/client/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body || {}
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' })
+    }
+
+    const normalizedEmail = normalizeEmail(email)
+
+    const result = await db.query(
+      'SELECT id, coach_name FROM apps WHERE coach_email = $1',
+      [normalizedEmail]
+    )
+
+    // Always return success to prevent email enumeration
+    if (result.rows.length === 0) {
+      return res.json({ ok: true, message: 'If an account exists, a reset link has been sent.' })
+    }
+
+    const client = result.rows[0]
+    const resetToken = await createPasswordResetToken('client', client.id)
+    const baseUrl = APP_CONFIG.baseUrl || getBaseUrl(req)
+    const resetUrl = `${baseUrl}/auth/reset-password/${resetToken}`
+
+    await sendPasswordResetEmail({ to: normalizedEmail, name: client.coach_name, resetUrl })
+
+    return res.json({ ok: true, message: 'If an account exists, a reset link has been sent.' })
+  } catch (err) {
+    console.error('Error in /auth/client/forgot-password:', err)
+    return res.status(500).json({ error: 'Failed to process request.' })
+  }
+})
+
+// Client Resend Verification
+app.post("/auth/client/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body || {}
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' })
+    }
+
+    const normalizedEmail = normalizeEmail(email)
+
+    const result = await db.query(
+      'SELECT id, coach_name, email_verified FROM apps WHERE coach_email = $1',
+      [normalizedEmail]
+    )
+
+    if (result.rows.length === 0) {
+      return res.json({ ok: true, message: 'If an account exists, a verification email has been sent.' })
+    }
+
+    const client = result.rows[0]
+
+    if (client.email_verified) {
+      return res.json({ ok: true, message: 'Email is already verified. You can sign in.' })
+    }
+
+    const verifyToken = await createEmailVerificationToken('client', client.id)
+    const baseUrl = APP_CONFIG.baseUrl || getBaseUrl(req)
+    const verifyUrl = `${baseUrl}/auth/verify/${verifyToken}`
+
+    await sendVerificationEmail({ to: normalizedEmail, name: client.coach_name, verifyUrl })
+
+    return res.json({ ok: true, message: 'Verification email sent. Please check your inbox.' })
+  } catch (err) {
+    console.error('Error in /auth/client/resend-verification:', err)
+    return res.status(500).json({ error: 'Failed to send verification email.' })
+  }
+})
+
+// ---------------------------------------------------------------------
+// Partner Authentication Routes
+// ---------------------------------------------------------------------
+
+// Partner Registration
+app.post("/auth/partner/register", async (req, res) => {
+  try {
+    const { email, password, name, paymentMethod, paymentHandle } = req.body || {}
+
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'Email, password, and name are required' })
+    }
+
+    const validation = validatePassword(password)
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error })
+    }
+
+    // Validate payment method if provided
+    if (paymentMethod && !["venmo", "paypal"].includes(paymentMethod)) {
+      return res.status(400).json({ error: 'Invalid payment method' })
+    }
+
+    const normalizedEmail = normalizeEmail(email)
+
+    // Check if partner exists
+    const existing = await db.query(
+      'SELECT id FROM partners WHERE email = $1',
+      [normalizedEmail]
+    )
+
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'An account with this email already exists' })
+    }
+
+    const passwordHash = await hashPassword(password)
+    const referralCode = crypto.randomBytes(6).toString('hex').toUpperCase()
+
+    const result = await db.query(
+      `INSERT INTO partners (email, name, password_hash, referral_code, email_verified, status, payment_method, payment_handle)
+       VALUES ($1, $2, $3, $4, false, 'active', $5, $6)
+       RETURNING id`,
+      [normalizedEmail, name, passwordHash, referralCode, paymentMethod || null, paymentHandle || null]
+    )
+
+    const verifyToken = await createEmailVerificationToken('partner', result.rows[0].id)
+    const baseUrl = APP_CONFIG.baseUrl || getBaseUrl(req)
+    const verifyUrl = `${baseUrl}/auth/verify/${verifyToken}`
+
+    await sendVerificationEmail({ to: normalizedEmail, name, verifyUrl })
+
+    return res.json({ ok: true, message: 'Account created. Please check your email to verify.' })
+  } catch (err) {
+    console.error('Error in /auth/partner/register:', err)
+    return res.status(500).json({ error: 'Registration failed. Please try again.' })
+  }
+})
+
+// Partner Login
+app.post("/auth/partner/login", async (req, res) => {
+  try {
+    const { email, password } = req.body || {}
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' })
+    }
+
+    const normalizedEmail = normalizeEmail(email)
+
+    const result = await db.query(
+      'SELECT id, password_hash, email_verified, name, status FROM partners WHERE email = $1',
+      [normalizedEmail]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid email or password' })
+    }
+
+    const partner = result.rows[0]
+
+    if (!partner.password_hash) {
+      return res.status(401).json({
+        error: 'Please complete your account setup or use Google to sign in.'
+      })
+    }
+
+    if (partner.status === 'inactive') {
+      return res.status(403).json({ error: 'This account has been deactivated.' })
+    }
+
+    const valid = await verifyPassword(password, partner.password_hash)
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid email or password' })
+    }
+
+    if (!partner.email_verified) {
+      return res.status(403).json({
+        error: 'Please verify your email before signing in.',
+        needsVerification: true,
+        email: normalizedEmail
+      })
+    }
+
+    const jwtToken = jwt.sign({ partnerId: partner.id }, JWT_SECRET, { expiresIn: '30d' })
+
+    res.cookie('closureai_partner_auth', jwtToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000
+    })
+
+    return res.json({ ok: true, redirectTo: '/partner/dashboard' })
+  } catch (err) {
+    console.error('Error in /auth/partner/login:', err)
+    return res.status(500).json({ error: 'Login failed. Please try again.' })
+  }
+})
+
+// Partner Forgot Password
+app.post("/auth/partner/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body || {}
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' })
+    }
+
+    const normalizedEmail = normalizeEmail(email)
+
+    const result = await db.query(
+      'SELECT id, name FROM partners WHERE email = $1',
+      [normalizedEmail]
+    )
+
+    if (result.rows.length === 0) {
+      return res.json({ ok: true, message: 'If an account exists, a reset link has been sent.' })
+    }
+
+    const partner = result.rows[0]
+    const resetToken = await createPasswordResetToken('partner', partner.id)
+    const baseUrl = APP_CONFIG.baseUrl || getBaseUrl(req)
+    const resetUrl = `${baseUrl}/auth/reset-password/${resetToken}`
+
+    await sendPasswordResetEmail({ to: normalizedEmail, name: partner.name, resetUrl })
+
+    return res.json({ ok: true, message: 'If an account exists, a reset link has been sent.' })
+  } catch (err) {
+    console.error('Error in /auth/partner/forgot-password:', err)
+    return res.status(500).json({ error: 'Failed to process request.' })
+  }
+})
+
+// Partner Resend Verification
+app.post("/auth/partner/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body || {}
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' })
+    }
+
+    const normalizedEmail = normalizeEmail(email)
+
+    const result = await db.query(
+      'SELECT id, name, email_verified FROM partners WHERE email = $1',
+      [normalizedEmail]
+    )
+
+    if (result.rows.length === 0) {
+      return res.json({ ok: true, message: 'If an account exists, a verification email has been sent.' })
+    }
+
+    const partner = result.rows[0]
+
+    if (partner.email_verified) {
+      return res.json({ ok: true, message: 'Email is already verified. You can sign in.' })
+    }
+
+    const verifyToken = await createEmailVerificationToken('partner', partner.id)
+    const baseUrl = APP_CONFIG.baseUrl || getBaseUrl(req)
+    const verifyUrl = `${baseUrl}/auth/verify/${verifyToken}`
+
+    await sendVerificationEmail({ to: normalizedEmail, name: partner.name, verifyUrl })
+
+    return res.json({ ok: true, message: 'Verification email sent. Please check your inbox.' })
+  } catch (err) {
+    console.error('Error in /auth/partner/resend-verification:', err)
+    return res.status(500).json({ error: 'Failed to send verification email.' })
+  }
+})
 
 // ---------------------------------------------------------------------
 // Google OAuth login
@@ -2630,6 +3762,229 @@ app.patch("/api/admin/app", requireAdmin, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------
+// Admin Partner/Commission Management (Platform-wide)
+// ---------------------------------------------------------------------
+
+// Get all partners (for platform admin)
+app.get("/api/admin/partners", requireAdmin, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT
+        p.id,
+        p.name,
+        p.email,
+        p.referral_code,
+        p.commission_percent,
+        p.payment_method,
+        p.payment_handle,
+        p.status,
+        p.email_verified,
+        p.created_at,
+        COUNT(DISTINCT a.id) as referral_count,
+        COALESCE(SUM(CASE WHEN c.status = 'pending' THEN c.amount ELSE 0 END), 0) as pending_earnings,
+        COALESCE(SUM(CASE WHEN c.status = 'paid' THEN c.amount ELSE 0 END), 0) as paid_earnings
+      FROM partners p
+      LEFT JOIN apps a ON a.partner_id = p.id
+      LEFT JOIN commissions c ON c.partner_id = p.id
+      GROUP BY p.id
+      ORDER BY p.created_at DESC`
+    );
+
+    return res.json({
+      ok: true,
+      data: result.rows.map((p) => ({
+        id: p.id,
+        name: p.name,
+        email: p.email,
+        referralCode: p.referral_code,
+        commissionPercent: parseFloat(p.commission_percent),
+        paymentMethod: p.payment_method,
+        paymentHandle: p.payment_handle,
+        status: p.status,
+        emailVerified: p.email_verified,
+        createdAt: p.created_at,
+        referralCount: parseInt(p.referral_count, 10),
+        pendingEarnings: parseFloat(p.pending_earnings),
+        paidEarnings: parseFloat(p.paid_earnings),
+      })),
+    });
+  } catch (err) {
+    console.error("Error in /api/admin/partners:", err);
+    return res.status(500).json({ error: "Failed to fetch partners" });
+  }
+});
+
+// Get all commissions (for platform admin)
+app.get("/api/admin/commissions", requireAdmin, async (req, res) => {
+  try {
+    const { status, partnerId } = req.query;
+
+    let query = `
+      SELECT
+        c.id,
+        c.partner_id,
+        c.client_id,
+        c.type,
+        c.amount,
+        c.status,
+        c.paid_at,
+        c.created_at,
+        p.name as partner_name,
+        p.email as partner_email,
+        p.payment_method,
+        p.payment_handle,
+        a.name as app_name,
+        a.coach_email
+      FROM commissions c
+      LEFT JOIN partners p ON p.id = c.partner_id
+      LEFT JOIN apps a ON a.id = c.client_id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (status) {
+      params.push(status);
+      query += ` AND c.status = $${params.length}`;
+    }
+
+    if (partnerId) {
+      params.push(partnerId);
+      query += ` AND c.partner_id = $${params.length}`;
+    }
+
+    query += ` ORDER BY c.created_at DESC`;
+
+    const result = await db.query(query, params);
+
+    return res.json({
+      ok: true,
+      data: result.rows.map((c) => ({
+        id: c.id,
+        partnerId: c.partner_id,
+        clientId: c.client_id,
+        type: c.type,
+        amount: parseFloat(c.amount),
+        status: c.status,
+        paidAt: c.paid_at,
+        createdAt: c.created_at,
+        partnerName: c.partner_name,
+        partnerEmail: c.partner_email,
+        paymentMethod: c.payment_method,
+        paymentHandle: c.payment_handle,
+        appName: c.app_name,
+        coachEmail: c.coach_email,
+      })),
+    });
+  } catch (err) {
+    console.error("Error in /api/admin/commissions:", err);
+    return res.status(500).json({ error: "Failed to fetch commissions" });
+  }
+});
+
+// Mark commission as paid
+app.put("/api/admin/commissions/:id/paid", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      `UPDATE commissions
+       SET status = 'paid', paid_at = NOW()
+       WHERE id = $1 AND status = 'pending'
+       RETURNING id, partner_id, amount, type`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Commission not found or already paid" });
+    }
+
+    const commission = result.rows[0];
+    console.log(`[Admin] Marked commission ${id} as paid: $${commission.amount} (${commission.type})`);
+
+    return res.json({
+      ok: true,
+      message: "Commission marked as paid",
+      data: {
+        id: commission.id,
+        partnerId: commission.partner_id,
+        amount: parseFloat(commission.amount),
+        type: commission.type,
+      },
+    });
+  } catch (err) {
+    console.error("Error in /api/admin/commissions/:id/paid:", err);
+    return res.status(500).json({ error: "Failed to update commission" });
+  }
+});
+
+// Update partner status
+app.put("/api/admin/partners/:id/status", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status || !["active", "suspended"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    const result = await db.query(
+      `UPDATE partners
+       SET status = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, name, email, status`,
+      [status, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Partner not found" });
+    }
+
+    const partner = result.rows[0];
+    console.log(`[Admin] Updated partner ${id} status to: ${status}`);
+
+    return res.json({
+      ok: true,
+      message: `Partner status updated to ${status}`,
+      data: partner,
+    });
+  } catch (err) {
+    console.error("Error in /api/admin/partners/:id/status:", err);
+    return res.status(500).json({ error: "Failed to update partner status" });
+  }
+});
+
+// Get commission summary (for dashboard stats)
+app.get("/api/admin/commissions/summary", requireAdmin, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT
+        COUNT(*) FILTER (WHERE status = 'pending') as pending_count,
+        COUNT(*) FILTER (WHERE status = 'paid') as paid_count,
+        COALESCE(SUM(amount) FILTER (WHERE status = 'pending'), 0) as pending_amount,
+        COALESCE(SUM(amount) FILTER (WHERE status = 'paid'), 0) as paid_amount,
+        COALESCE(SUM(amount), 0) as total_amount
+      FROM commissions`
+    );
+
+    const summary = result.rows[0];
+
+    return res.json({
+      ok: true,
+      data: {
+        pendingCount: parseInt(summary.pending_count, 10),
+        paidCount: parseInt(summary.paid_count, 10),
+        pendingAmount: parseFloat(summary.pending_amount),
+        paidAmount: parseFloat(summary.paid_amount),
+        totalAmount: parseFloat(summary.total_amount),
+      },
+    });
+  } catch (err) {
+    console.error("Error in /api/admin/commissions/summary:", err);
+    return res.status(500).json({ error: "Failed to fetch commission summary" });
+  }
+});
+
+// ---------------------------------------------------------------------
 // Onboarding Routes (Coach signup flow)
 // ---------------------------------------------------------------------
 
@@ -2662,10 +4017,12 @@ app.get("/onboard/success", (req, res) => {
 app.post("/api/onboard/create-checkout", async (req, res) => {
   try {
     const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+    const { referralCode } = req.body || {};
 
     console.log("[STRIPE] Creating checkout with prices:", {
       monthly: process.env.STRIPE_MONTHLY_PRICE_ID,
       setup: process.env.STRIPE_SETUP_PRICE_ID,
+      referralCode: referralCode || "none",
     });
 
     // First, verify the price exists and get its details
@@ -2699,6 +4056,14 @@ app.post("/api/onboard/create-checkout", async (req, res) => {
       });
     }
 
+    // Build metadata with referral code if provided
+    const sessionMetadata = {
+      product: "coach_platform",
+    };
+    if (referralCode) {
+      sessionMetadata.referral_code = referralCode;
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: lineItems,
@@ -2709,9 +4074,7 @@ app.post("/api/onboard/create-checkout", async (req, res) => {
       },
       success_url: `${process.env.APP_BASE_URL || "https://app.getclosureai.com"}/onboard/form?token={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.APP_BASE_URL || "https://app.getclosureai.com"}/onboard?cancelled=true`,
-      metadata: {
-        product: "coach_platform",
-      },
+      metadata: sessionMetadata,
     });
 
     console.log("[STRIPE] Checkout session created:", session.id);
