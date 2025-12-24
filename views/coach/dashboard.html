@@ -352,8 +352,16 @@
 
         <!-- Clients List -->
         <div class="admin-card" style="margin-top: 24px;">
-          <div class="admin-card-header">
+          <div class="admin-card-header" style="display: flex; justify-content: space-between; align-items: center;">
             <h2 class="admin-card-title">Your Clients</h2>
+            <button class="btn btn-secondary" onclick="exportClients()" style="font-size: 13px; padding: 6px 12px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px; vertical-align: -2px;">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Export CSV
+            </button>
           </div>
           <div class="admin-card-body" id="clients-container">
             <div style="text-align: center; padding: 24px; color: #64748b;">
@@ -538,6 +546,11 @@
         console.error('Logout error:', err);
       }
     });
+
+    // Export clients as CSV
+    function exportClients() {
+      window.location.href = '/api/coach/clients/export';
+    }
 
     // Initialize
     loadDashboard();

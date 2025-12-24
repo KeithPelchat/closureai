@@ -1557,6 +1557,50 @@ app.get("/api/coach/clients", requireCoachAuth, async (req, res) => {
   }
 });
 
+// Coach API: Export clients as CSV
+app.get("/api/coach/clients/export", requireCoachAuth, async (req, res) => {
+  try {
+    const coachId = req.coach.id;
+
+    const result = await db.query(
+      `SELECT
+        u.id,
+        u.email,
+        u.name,
+        u.created_at,
+        u.holiday_pass_expires_at,
+        CASE WHEN u.holiday_pass_expires_at > NOW() THEN 'active' ELSE 'expired' END as status,
+        (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.app_id = $1) as session_count,
+        (SELECT MAX(created_at) FROM sessions s WHERE s.user_id = u.id AND s.app_id = $1) as last_session
+      FROM users u
+      WHERE u.app_id = $1
+      ORDER BY u.created_at DESC`,
+      [coachId]
+    );
+
+    // Build CSV content
+    const headers = ['name', 'email', 'status', 'joined_date', 'last_session_date', 'total_sessions'];
+    const rows = result.rows.map(r => [
+      `"${(r.name || '').replace(/"/g, '""')}"`,
+      `"${(r.email || '').replace(/"/g, '""')}"`,
+      r.status,
+      r.created_at ? new Date(r.created_at).toISOString().split('T')[0] : '',
+      r.last_session ? new Date(r.last_session).toISOString().split('T')[0] : '',
+      r.session_count || 0
+    ]);
+
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const filename = `closureai-users-${new Date().toISOString().split('T')[0]}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(csv);
+  } catch (err) {
+    console.error("Error in /api/coach/clients/export:", err);
+    return res.status(500).json({ error: "Failed to export clients" });
+  }
+});
+
 // Coach API: Update profile
 app.put("/api/coach/profile", requireCoachAuth, async (req, res) => {
   try {
