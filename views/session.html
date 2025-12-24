@@ -13,7 +13,29 @@
       :root {
         --primary-color: {{PRIMARY_COLOR}};
         --secondary-color: {{SECONDARY_COLOR}};
+        --background-color: {{BACKGROUND_COLOR}};
       }
+
+      /* --------- Apply tenant colors to UI elements --------- */
+
+      body {
+        background: var(--background-color) !important;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-color)) !important;
+        color: var(--secondary-color) !important;
+        border: none;
+      }
+
+      .btn-primary:hover {
+        filter: brightness(1.1);
+      }
+
+      .app-header {
+        border-bottom-color: var(--primary-color);
+      }
+
       /* ---- Let the page scroll naturally ---- */
 
       html,

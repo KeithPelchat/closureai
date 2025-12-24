@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Branding - My App - ClosureAI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+  <style>
+    /* Coach dashboard overrides */
+    .admin-badge {
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+    }
+
+    .admin-sidebar-brand-mark {
+      background: linear-gradient(135deg, #22c55e, #4ade80);
+    }
+
+    .admin-nav-item.active {
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      border-left-color: #22c55e;
+    }
+
+    .branding-grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .branding-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .form-group {
+      margin-bottom: 24px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+
+    .form-hint {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 6px;
+    }
+
+    .logo-upload {
+      width: 200px;
+      height: 200px;
+      border: 2px dashed #334155;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: #0f172a;
+      overflow: hidden;
+    }
+
+    .logo-upload:hover {
+      border-color: #22c55e;
+    }
+
+    .logo-upload.has-logo {
+      border-style: solid;
+    }
+
+    .logo-upload img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .logo-upload-placeholder {
+      text-align: center;
+      color: #64748b;
+    }
+
+    .logo-upload-placeholder svg {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+
+    .logo-upload-placeholder span {
+      font-size: 14px;
+    }
+
+    .color-picker-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .color-picker {
+      width: 60px;
+      height: 44px;
+      padding: 4px;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: #0f172a;
+      cursor: pointer;
+    }
+
+    .color-hex {
+      width: 120px;
+      padding: 12px 14px;
+      font-size: 14px;
+      font-family: 'SF Mono', ui-monospace, monospace;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #e2e8f0;
+      outline: none;
+    }
+
+    .color-hex:focus {
+      border-color: #22c55e;
+    }
+
+    .preview-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 24px;
+      position: sticky;
+      top: 24px;
+    }
+
+    .preview-card h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #94a3b8;
+      margin: 0 0 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .preview-app {
+      background: var(--preview-background, #f8f9fa);
+      border-radius: 12px;
+      padding: 16px;
+      min-height: 280px;
+    }
+
+    .preview-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .preview-logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--preview-primary, #0ea5e9), var(--preview-secondary, #38bdf8));
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .preview-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .preview-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .preview-btn {
+      display: inline-block;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--preview-primary, #0ea5e9), var(--preview-secondary, #38bdf8));
+      color: #fff;
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .preview-message {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 12px;
+      font-size: 14px;
+      color: #cbd5e1;
+      line-height: 1.6;
+    }
+
+    .btn-save {
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      background: #22c55e;
+      color: #020617;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn-save:hover {
+      opacity: 0.9;
+    }
+
+    .btn-save:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .save-message {
+      display: inline-block;
+      margin-left: 16px;
+      font-size: 14px;
+      color: #4ade80;
+    }
+
+    .profile-section {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #334155;
+    }
+
+    .profile-section h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin: 0 0 20px;
+    }
+
+    .form-input {
+      width: 100%;
+      max-width: 500px;
+      padding: 12px 14px;
+      font-size: 14px;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #e2e8f0;
+      outline: none;
+    }
+
+    .form-input:focus {
+      border-color: #22c55e;
+    }
+
+    .form-textarea {
+      width: 100%;
+      max-width: 500px;
+      padding: 12px 14px;
+      font-size: 14px;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #e2e8f0;
+      outline: none;
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    .form-textarea:focus {
+      border-color: #22c55e;
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <a href="/my-app" class="admin-sidebar-brand">
+          <div class="admin-sidebar-brand-mark"></div>
+          <div>
+            <div class="admin-sidebar-title">ClosureAI</div>
+            <div class="admin-badge">My App</div>
+          </div>
+        </a>
+      </div>
+
+      <nav class="admin-sidebar-nav">
+        <a href="/my-app" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="9"/>
+            <rect x="14" y="3" width="7" height="5"/>
+            <rect x="14" y="12" width="7" height="9"/>
+            <rect x="3" y="16" width="7" height="5"/>
+          </svg>
+          Dashboard
+        </a>
+        <a href="/my-app/settings" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          Settings
+        </a>
+        <a href="/my-app/branding" class="admin-nav-item active">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="13.5" cy="6.5" r=".5"/>
+            <circle cx="17.5" cy="10.5" r=".5"/>
+            <circle cx="8.5" cy="7.5" r=".5"/>
+            <circle cx="6.5" cy="12.5" r=".5"/>
+            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 6.012 17.461 2 12 2z"/>
+          </svg>
+          Branding
+        </a>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <button type="button" class="admin-back-link" id="logout-btn" style="background:none;border:none;color:inherit;cursor:pointer;width:100%;text-align:left;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-header">
+        <h1 class="admin-header-title">Branding</h1>
+      </header>
+
+      <div class="admin-content">
+        <div class="branding-grid">
+          <div class="branding-form">
+            <div class="admin-card">
+              <div class="admin-card-header">
+                <h2 class="admin-card-title">Visual Identity</h2>
+              </div>
+              <div class="admin-card-body">
+                <div class="form-group">
+                  <label class="form-label">Logo</label>
+                  <div class="logo-upload" id="logo-upload">
+                    <div class="logo-upload-placeholder" id="logo-placeholder">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                      </svg>
+                      <span>Click to upload</span>
+                    </div>
+                    <img id="logo-preview" style="display: none;" />
+                  </div>
+                  <input type="file" id="logo-input" accept="image/*" hidden />
+                  <p class="form-hint">Recommended: 400x400px or larger, PNG or JPG</p>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Primary Color</label>
+                  <div class="color-picker-wrap">
+                    <input type="color" class="color-picker" id="primary-color" value="#0ea5e9" />
+                    <input type="text" class="color-hex" id="primary-color-hex" value="#0ea5e9" />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Secondary Color</label>
+                  <p class="form-hint">Used for button text</p>
+                  <div class="color-picker-wrap">
+                    <input type="color" class="color-picker" id="secondary-color" value="#38bdf8" />
+                    <input type="text" class="color-hex" id="secondary-color-hex" value="#38bdf8" />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Background Color</label>
+                  <p class="form-hint">Page background for your client portal</p>
+                  <div class="color-picker-wrap">
+                    <input type="color" class="color-picker" id="background-color" value="#f8f9fa" />
+                    <input type="text" class="color-hex" id="background-color-hex" value="#f8f9fa" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="admin-card profile-section" style="margin-top: 24px;">
+              <div class="admin-card-header">
+                <h2 class="admin-card-title">Profile Information</h2>
+              </div>
+              <div class="admin-card-body">
+                <div class="form-group">
+                  <label class="form-label">Business Name</label>
+                  <input type="text" class="form-input" id="business-name" />
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Coach Name</label>
+                  <input type="text" class="form-input" id="coach-name" />
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Coaching Style</label>
+                  <textarea class="form-textarea" id="coaching-style" placeholder="Describe your coaching approach..."></textarea>
+                  <p class="form-hint">This helps the AI understand and adopt your style</p>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Bio</label>
+                  <textarea class="form-textarea" id="coach-bio" placeholder="Brief bio about yourself..."></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top: 24px;">
+              <button type="button" class="btn-save" id="save-btn">Save Changes</button>
+              <span class="save-message" id="save-message"></span>
+            </div>
+          </div>
+
+          <div class="preview-card">
+            <h3>Preview</h3>
+            <div class="preview-app" id="preview-app">
+              <div class="preview-header">
+                <div class="preview-logo" id="preview-logo"></div>
+                <span class="preview-name" id="preview-name">Your App</span>
+              </div>
+              <div class="preview-message">
+                Welcome to your clarity space. Take a moment to share what's on your mind...
+              </div>
+              <div class="preview-btn" id="preview-btn">Start Session</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let profile = null;
+    let logoFile = null;
+
+    // Load profile
+    async function loadProfile() {
+      try {
+        const res = await fetch('/api/coach/profile');
+        const data = await res.json();
+
+        if (data.ok && data.data) {
+          profile = data.data;
+
+          // Set form values
+          document.getElementById('business-name').value = profile.businessName || '';
+          document.getElementById('coach-name').value = profile.coachName || '';
+          document.getElementById('coaching-style').value = profile.coachingStyle || '';
+          document.getElementById('coach-bio').value = profile.coachBio || '';
+
+          // Colors
+          document.getElementById('primary-color').value = profile.primaryColor || '#0ea5e9';
+          document.getElementById('primary-color-hex').value = profile.primaryColor || '#0ea5e9';
+          document.getElementById('secondary-color').value = profile.secondaryColor || '#38bdf8';
+          document.getElementById('secondary-color-hex').value = profile.secondaryColor || '#38bdf8';
+          document.getElementById('background-color').value = profile.backgroundColor || '#f8f9fa';
+          document.getElementById('background-color-hex').value = profile.backgroundColor || '#f8f9fa';
+
+          // Logo
+          if (profile.logoUrl) {
+            const img = document.getElementById('logo-preview');
+            img.src = profile.logoUrl;
+            img.style.display = 'block';
+            document.getElementById('logo-placeholder').style.display = 'none';
+            document.getElementById('logo-upload').classList.add('has-logo');
+
+            // Preview logo
+            document.getElementById('preview-logo').innerHTML = `<img src="${profile.logoUrl}" />`;
+          }
+
+          // Update preview
+          updatePreview();
+        }
+      } catch (err) {
+        console.error('Failed to load profile:', err);
+      }
+    }
+
+    // Update preview
+    function updatePreview() {
+      const primaryColor = document.getElementById('primary-color').value;
+      const secondaryColor = document.getElementById('secondary-color').value;
+      const backgroundColor = document.getElementById('background-color').value;
+      const businessName = document.getElementById('business-name').value || 'Your App';
+
+      document.documentElement.style.setProperty('--preview-primary', primaryColor);
+      document.documentElement.style.setProperty('--preview-secondary', secondaryColor);
+      document.documentElement.style.setProperty('--preview-background', backgroundColor);
+      document.getElementById('preview-name').textContent = businessName;
+
+      // Update preview logo gradient if no image
+      const previewLogo = document.getElementById('preview-logo');
+      if (!previewLogo.querySelector('img')) {
+        previewLogo.style.background = `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`;
+      }
+
+      // Update button
+      document.getElementById('preview-btn').style.background = `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`;
+    }
+
+    // Color sync
+    document.getElementById('primary-color').addEventListener('input', (e) => {
+      document.getElementById('primary-color-hex').value = e.target.value;
+      updatePreview();
+    });
+
+    document.getElementById('primary-color-hex').addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+        document.getElementById('primary-color').value = val;
+        updatePreview();
+      }
+    });
+
+    document.getElementById('secondary-color').addEventListener('input', (e) => {
+      document.getElementById('secondary-color-hex').value = e.target.value;
+      updatePreview();
+    });
+
+    document.getElementById('secondary-color-hex').addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+        document.getElementById('secondary-color').value = val;
+        updatePreview();
+      }
+    });
+
+    document.getElementById('background-color').addEventListener('input', (e) => {
+      document.getElementById('background-color-hex').value = e.target.value;
+      updatePreview();
+    });
+
+    document.getElementById('background-color-hex').addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+        document.getElementById('background-color').value = val;
+        updatePreview();
+      }
+    });
+
+    document.getElementById('business-name').addEventListener('input', updatePreview);
+
+    // Logo upload
+    const logoUpload = document.getElementById('logo-upload');
+    const logoInput = document.getElementById('logo-input');
+
+    logoUpload.addEventListener('click', () => logoInput.click());
+
+    logoInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file.');
+        return;
+      }
+
+      logoFile = file;
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = document.getElementById('logo-preview');
+        img.src = ev.target.result;
+        img.style.display = 'block';
+        document.getElementById('logo-placeholder').style.display = 'none';
+        document.getElementById('logo-upload').classList.add('has-logo');
+
+        // Update preview
+        document.getElementById('preview-logo').innerHTML = `<img src="${ev.target.result}" />`;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Save
+    document.getElementById('save-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('save-btn');
+      const msgEl = document.getElementById('save-message');
+      btn.disabled = true;
+      msgEl.textContent = '';
+
+      try {
+        // Upload logo if new file
+        let logoUrl = profile?.logoUrl;
+        if (logoFile) {
+          msgEl.textContent = 'Uploading logo...';
+          msgEl.style.color = '#94a3b8';
+
+          const reader = new FileReader();
+          const imageData = await new Promise((resolve) => {
+            reader.onload = (e) => resolve(e.target.result);
+            reader.readAsDataURL(logoFile);
+          });
+
+          const uploadRes = await fetch('/api/coach/upload-logo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image: imageData,
+              filename: logoFile.name,
+              contentType: logoFile.type,
+            }),
+          });
+
+          const uploadData = await uploadRes.json();
+          if (uploadData.ok) {
+            logoUrl = uploadData.logoUrl;
+            logoFile = null;
+          } else {
+            msgEl.textContent = uploadData.error || 'Failed to upload logo.';
+            msgEl.style.color = '#f87171';
+            btn.disabled = false;
+            return;
+          }
+        }
+
+        // Update branding
+        const brandingRes = await fetch('/api/coach/branding', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            primaryColor: document.getElementById('primary-color').value,
+            secondaryColor: document.getElementById('secondary-color').value,
+            backgroundColor: document.getElementById('background-color').value,
+            logoUrl: logoUrl || undefined,
+          }),
+        });
+
+        const brandingData = await brandingRes.json();
+        if (!brandingData.ok) {
+          throw new Error(brandingData.error);
+        }
+
+        // Update profile
+        const profileRes = await fetch('/api/coach/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            businessName: document.getElementById('business-name').value,
+            coachName: document.getElementById('coach-name').value,
+            coachingStyle: document.getElementById('coaching-style').value,
+            coachBio: document.getElementById('coach-bio').value,
+          }),
+        });
+
+        const profileData = await profileRes.json();
+        if (!profileData.ok) {
+          throw new Error(profileData.error);
+        }
+
+        msgEl.textContent = 'Changes saved!';
+        msgEl.style.color = '#4ade80';
+      } catch (err) {
+        msgEl.textContent = err.message || 'Failed to save.';
+        msgEl.style.color = '#f87171';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // Logout
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      const res = await fetch('/coach/logout', { method: 'POST' });
+      const data = await res.json();
+      if (data.redirectTo) window.location.href = data.redirectTo;
+    });
+
+    // Initialize
+    loadProfile();
+  </script>
+</body>
+</html>

@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>My App - ClosureAI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+  <style>
+    /* Coach dashboard overrides */
+    .admin-badge {
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+    }
+
+    .admin-sidebar-brand-mark {
+      background: linear-gradient(135deg, #22c55e, #4ade80);
+    }
+
+    .admin-nav-item.active {
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      border-left-color: #22c55e;
+    }
+
+    .stat-card-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+
+    .stat-card-label {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    .stat-card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 24px;
+      border: 1px solid #334155;
+    }
+
+    .app-url-box {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .app-url-box input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #38bdf8;
+      font-size: 14px;
+      font-family: 'SF Mono', ui-monospace, monospace;
+      outline: none;
+    }
+
+    .btn-copy {
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      border: none;
+      border-radius: 6px;
+      background: #22c55e;
+      color: #020617;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn-copy:hover {
+      opacity: 0.9;
+    }
+
+    .status-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .status-active {
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+    }
+
+    .status-pending_review, .status-pending_onboarding {
+      background: rgba(251, 191, 36, 0.2);
+      color: #fbbf24;
+    }
+
+    .status-suspended {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+    }
+
+    .clients-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+
+    .clients-table th,
+    .clients-table td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #334155;
+    }
+
+    .clients-table th {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+    }
+
+    .clients-table td {
+      font-size: 14px;
+      color: #e2e8f0;
+    }
+
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .quick-action-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      color: #e2e8f0;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+
+    .quick-action-btn:hover {
+      background: #1e293b;
+      border-color: #4ade80;
+    }
+
+    .quick-action-btn svg {
+      color: #4ade80;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: #64748b;
+    }
+
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      opacity: 0.5;
+      margin-bottom: 16px;
+    }
+
+    .grant-access-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto auto;
+      gap: 12px;
+      align-items: end;
+      margin-bottom: 20px;
+    }
+
+    .grant-access-form .form-group {
+      margin: 0;
+    }
+
+    .grant-access-form label {
+      display: block;
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+
+    .grant-access-form input,
+    .grant-access-form select {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 14px;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    .btn-grant {
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      border: none;
+      border-radius: 6px;
+      background: #22c55e;
+      color: #020617;
+      cursor: pointer;
+    }
+
+    .btn-grant:hover {
+      opacity: 0.9;
+    }
+
+    @media (max-width: 900px) {
+      .grant-access-form {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <a href="/my-app" class="admin-sidebar-brand">
+          <div class="admin-sidebar-brand-mark"></div>
+          <div>
+            <div class="admin-sidebar-title">ClosureAI</div>
+            <div class="admin-badge">My App</div>
+          </div>
+        </a>
+      </div>
+
+      <nav class="admin-sidebar-nav">
+        <a href="/my-app" class="admin-nav-item active">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="9"/>
+            <rect x="14" y="3" width="7" height="5"/>
+            <rect x="14" y="12" width="7" height="9"/>
+            <rect x="3" y="16" width="7" height="5"/>
+          </svg>
+          Dashboard
+        </a>
+        <a href="/my-app/settings" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          Settings
+        </a>
+        <a href="/my-app/branding" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="13.5" cy="6.5" r=".5"/>
+            <circle cx="17.5" cy="10.5" r=".5"/>
+            <circle cx="8.5" cy="7.5" r=".5"/>
+            <circle cx="6.5" cy="12.5" r=".5"/>
+            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 6.012 17.461 2 12 2z"/>
+          </svg>
+          Branding
+        </a>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <button type="button" class="admin-back-link" id="logout-btn" style="background:none;border:none;color:inherit;cursor:pointer;width:100%;text-align:left;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-header">
+        <h1 class="admin-header-title">Dashboard</h1>
+        <span class="status-badge" id="app-status">Loading...</span>
+      </header>
+
+      <div class="admin-content">
+        <!-- App URL -->
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Your App URL</h2>
+          </div>
+          <div class="admin-card-body">
+            <p style="color: #94a3b8; font-size: 14px; margin: 0;">Share this link with your clients:</p>
+            <div class="app-url-box">
+              <input type="text" id="app-url" readonly />
+              <button type="button" class="btn-copy" id="copy-url-btn">Copy</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-top: 24px;">
+          <div class="stat-card">
+            <div class="stat-card-value" id="stat-clients">-</div>
+            <div class="stat-card-label">Total Clients</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-value" id="stat-conversations">-</div>
+            <div class="stat-card-label">Conversations</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-value" id="stat-sessions">-</div>
+            <div class="stat-card-label">AI Sessions</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-value" id="stat-recent">-</div>
+            <div class="stat-card-label">Sessions (7 days)</div>
+          </div>
+        </div>
+
+        <!-- Grant Access -->
+        <div class="admin-card" style="margin-top: 24px;">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Grant Client Access</h2>
+          </div>
+          <div class="admin-card-body">
+            <div class="grant-access-form">
+              <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="grant-email" placeholder="client@example.com" />
+              </div>
+              <div class="form-group">
+                <label>Name (optional)</label>
+                <input type="text" id="grant-name" placeholder="Client Name" />
+              </div>
+              <div class="form-group">
+                <label>Access Duration</label>
+                <select id="grant-days">
+                  <option value="30">30 days</option>
+                  <option value="60">60 days</option>
+                  <option value="90">90 days</option>
+                  <option value="180">6 months</option>
+                  <option value="365">1 year</option>
+                </select>
+              </div>
+              <button type="button" class="btn-grant" id="grant-btn">Grant Access</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Clients List -->
+        <div class="admin-card" style="margin-top: 24px;">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Your Clients</h2>
+          </div>
+          <div class="admin-card-body" id="clients-container">
+            <div style="text-align: center; padding: 24px; color: #64748b;">
+              Loading...
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Helper function
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      return new Date(dateStr).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+
+    // Load profile and stats
+    async function loadDashboard() {
+      try {
+        // Load profile
+        const profileRes = await fetch('/api/coach/profile');
+        const profileData = await profileRes.json();
+
+        if (profileData.ok && profileData.data) {
+          const p = profileData.data;
+
+          // Set app URL
+          const appUrl = p.customDomain
+            ? `https://${p.customDomain}`
+            : p.subdomain
+              ? `https://${p.subdomain}.getclosureai.com`
+              : 'Not configured';
+          document.getElementById('app-url').value = appUrl;
+
+          // Set status badge
+          const statusEl = document.getElementById('app-status');
+          statusEl.textContent = p.status.replace(/_/g, ' ');
+          statusEl.className = `status-badge status-${p.status}`;
+        }
+
+        // Load stats
+        const statsRes = await fetch('/api/coach/stats');
+        const statsData = await statsRes.json();
+
+        if (statsData.ok && statsData.data) {
+          const s = statsData.data;
+          document.getElementById('stat-clients').textContent = s.totalClients;
+          document.getElementById('stat-conversations').textContent = s.totalConversations;
+          document.getElementById('stat-sessions').textContent = s.totalSessions;
+          document.getElementById('stat-recent').textContent = s.sessionsLast7Days;
+        }
+      } catch (err) {
+        console.error('Failed to load dashboard:', err);
+      }
+    }
+
+    // Load clients
+    async function loadClients() {
+      const container = document.getElementById('clients-container');
+      try {
+        const res = await fetch('/api/coach/clients');
+        const data = await res.json();
+
+        if (!data.ok || !data.data.length) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              <p>No clients yet. Grant access to your first client above!</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = `
+          <table class="clients-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Name</th>
+                <th>Sessions</th>
+                <th>Last Active</th>
+                <th>Access Expires</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.data.map(c => `
+                <tr>
+                  <td>${escapeHtml(c.email)}</td>
+                  <td>${escapeHtml(c.name) || '-'}</td>
+                  <td>${c.sessionCount}</td>
+                  <td>${formatDate(c.lastSession)}</td>
+                  <td>${formatDate(c.accessExpiresAt)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch (err) {
+        console.error('Failed to load clients:', err);
+        container.innerHTML = '<p style="color: #ef4444;">Failed to load clients</p>';
+      }
+    }
+
+    // Copy URL
+    document.getElementById('copy-url-btn').addEventListener('click', () => {
+      const urlInput = document.getElementById('app-url');
+      urlInput.select();
+      document.execCommand('copy');
+      const btn = document.getElementById('copy-url-btn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 2000);
+    });
+
+    // Grant access
+    document.getElementById('grant-btn').addEventListener('click', async () => {
+      const email = document.getElementById('grant-email').value.trim();
+      const name = document.getElementById('grant-name').value.trim();
+      const days = document.getElementById('grant-days').value;
+      const btn = document.getElementById('grant-btn');
+
+      if (!email) {
+        alert('Please enter an email address.');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Granting...';
+
+      try {
+        const res = await fetch('/api/coach/grant-access', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, name, days: parseInt(days, 10) }),
+        });
+
+        const data = await res.json();
+
+        if (data.ok) {
+          alert(`Access granted to ${email} for ${days} days.`);
+          document.getElementById('grant-email').value = '';
+          document.getElementById('grant-name').value = '';
+          loadClients();
+          loadDashboard();
+        } else {
+          alert(data.error || 'Failed to grant access.');
+        }
+      } catch (err) {
+        alert('Network error. Please try again.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Grant Access';
+      }
+    });
+
+    // Logout
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      try {
+        const res = await fetch('/coach/logout', { method: 'POST' });
+        const data = await res.json();
+        if (data.redirectTo) {
+          window.location.href = data.redirectTo;
+        }
+      } catch (err) {
+        console.error('Logout error:', err);
+      }
+    });
+
+    // Initialize
+    loadDashboard();
+    loadClients();
+  </script>
+</body>
+</html>

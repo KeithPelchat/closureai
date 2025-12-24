@@ -20,6 +20,7 @@
       :root {
         --primary-color: {{PRIMARY_COLOR}};
         --secondary-color: {{SECONDARY_COLOR}};
+        --background-color: {{BACKGROUND_COLOR}};
       }
 
       body {
@@ -30,7 +31,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #f3f4f6;
+        background: var(--background-color);
       }
 
       .auth-shell {
@@ -165,8 +166,12 @@
         font-weight: 600;
         cursor: pointer;
         background: var(--primary-color, #111827);
-        color: #f9fafb;
+        color: var(--secondary-color, #f9fafb);
         width: 100%;
+      }
+
+      .btn-primary:hover {
+        filter: brightness(1.1);
       }
 
       .btn-primary:disabled {

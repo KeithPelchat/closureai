@@ -12,12 +12,36 @@
       :root {
         --primary-color: {{PRIMARY_COLOR}};
         --secondary-color: {{SECONDARY_COLOR}};
+        --background-color: {{BACKGROUND_COLOR}};
       }
-      /* --------- Global layout & typography polish --------- */
+
+      /* --------- Apply tenant colors to UI elements --------- */
 
       body {
+        background: var(--background-color) !important;
         color: #0f172a;
       }
+
+      .btn-primary {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-color)) !important;
+        color: var(--secondary-color) !important;
+        border: none;
+      }
+
+      .btn-primary:hover {
+        filter: brightness(1.1);
+      }
+
+      .badge-soft-success {
+        background: var(--primary-color) !important;
+        color: var(--secondary-color) !important;
+      }
+
+      .app-header {
+        border-bottom-color: var(--primary-color);
+      }
+
+      /* --------- Global layout & typography polish --------- */
 
       .app-main-inner {
         max-width: 960px;

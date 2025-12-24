@@ -240,7 +240,7 @@ app.post(
 // ---------------------------------------------------------------------
 // Global middleware for everything else
 // ---------------------------------------------------------------------
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
 // ---------------------------------------------------------------------
@@ -276,12 +276,12 @@ async function resolveTenant(req, res, next) {
     const query = lookupType === "subdomain"
       ? `SELECT id, slug, name, business_name, coach_name, coach_email,
            coaching_niche, target_audience, coaching_style, coach_bio,
-           custom_system_prompt, logo_url, primary_color, secondary_color,
+           custom_system_prompt, logo_url, primary_color, secondary_color, background_color,
            subdomain, custom_domain, status, is_active, auto_grant_access_days
          FROM apps WHERE subdomain = $1 AND is_active = true`
       : `SELECT id, slug, name, business_name, coach_name, coach_email,
            coaching_niche, target_audience, coaching_style, coach_bio,
-           custom_system_prompt, logo_url, primary_color, secondary_color,
+           custom_system_prompt, logo_url, primary_color, secondary_color, background_color,
            subdomain, custom_domain, status, is_active, auto_grant_access_days
          FROM apps WHERE custom_domain = $1 AND is_active = true`;
 
@@ -653,6 +653,7 @@ function getTemplateTokens(tenant = null, extraTokens = {}) {
     // Tenant branding defaults (used in CSS variables)
     PRIMARY_COLOR: "#0d9488",
     SECONDARY_COLOR: "#14b8a6",
+    BACKGROUND_COLOR: "#f8f9fa",
     COACH_NAME: "your coach",
     BUSINESS_NAME: APP_CONFIG.appName,
   };
@@ -665,6 +666,7 @@ function getTemplateTokens(tenant = null, extraTokens = {}) {
     defaults.COACH_NAME = tenant.coach_name || defaults.COACH_NAME;
     defaults.PRIMARY_COLOR = tenant.primary_color || defaults.PRIMARY_COLOR;
     defaults.SECONDARY_COLOR = tenant.secondary_color || defaults.SECONDARY_COLOR;
+    defaults.BACKGROUND_COLOR = tenant.background_color || defaults.BACKGROUND_COLOR;
     defaults.THEME_COLOR = tenant.primary_color || defaults.THEME_COLOR;
     if (tenant.logo_url) {
       defaults.APP_LOGO = tenant.logo_url;
@@ -943,6 +945,75 @@ async function requirePartnerAuth(req, res, next) {
       });
     }
     return res.redirect("/partners");
+  }
+}
+
+// ---------------------------------------------------------------------
+// Coach auth middleware (coaches are in apps table)
+// ---------------------------------------------------------------------
+
+async function requireCoachAuth(req, res, next) {
+  const token = req.cookies.closureai_client_auth;
+
+  if (!token) {
+    if (wantsJsonResponse(req)) {
+      return res.status(401).json({
+        ok: false,
+        code: "UNAUTHORIZED",
+        message: "Not authenticated",
+      });
+    }
+    return res.redirect("/coach/login");
+  }
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+
+    const result = await db.query(
+      "SELECT * FROM apps WHERE id = $1",
+      [payload.clientId]
+    );
+
+    if (result.rows.length === 0) {
+      res.clearCookie("closureai_client_auth");
+      if (wantsJsonResponse(req)) {
+        return res.status(401).json({
+          ok: false,
+          code: "UNAUTHORIZED",
+          message: "Account not found",
+        });
+      }
+      return res.redirect("/coach/login");
+    }
+
+    const coach = result.rows[0];
+
+    // Check if coach is suspended
+    if (coach.status === "suspended" || coach.status === "cancelled") {
+      res.clearCookie("closureai_client_auth");
+      if (wantsJsonResponse(req)) {
+        return res.status(403).json({
+          ok: false,
+          code: "ACCOUNT_SUSPENDED",
+          message: "Your account has been suspended",
+        });
+      }
+      return res.redirect("/coach/login");
+    }
+
+    req.coach = coach;
+    return next();
+  } catch (err) {
+    console.error("requireCoachAuth error:", err);
+    res.clearCookie("closureai_client_auth");
+    if (wantsJsonResponse(req)) {
+      return res.status(401).json({
+        ok: false,
+        code: "UNAUTHORIZED",
+        message: "Authentication error",
+      });
+    }
+    return res.redirect("/coach/login");
   }
 }
 
@@ -1303,6 +1374,520 @@ app.get("/api/partner/profile", requirePartnerAuth, async (req, res) => {
   } catch (err) {
     console.error("Error in /api/partner/profile:", err);
     return res.status(500).json({ error: "Failed to fetch profile" });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Coach Dashboard Routes
+// ---------------------------------------------------------------------
+
+// Coach login page
+app.get("/coach/login", (req, res) => {
+  // Check if already authenticated
+  const token = req.cookies.closureai_client_auth;
+  if (token) {
+    try {
+      jwt.verify(token, JWT_SECRET);
+      return res.redirect("/my-app");
+    } catch (e) {
+      res.clearCookie("closureai_client_auth");
+    }
+  }
+  res.sendFile(path.join(__dirname, "views", "coach", "login.html"));
+});
+
+// Coach dashboard page
+app.get("/my-app", requireCoachAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "coach", "dashboard.html"));
+});
+
+// Coach settings page
+app.get("/my-app/settings", requireCoachAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "coach", "settings.html"));
+});
+
+// Coach branding page
+app.get("/my-app/branding", requireCoachAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "coach", "branding.html"));
+});
+
+// Coach logout
+app.post("/coach/logout", (req, res) => {
+  res.clearCookie("closureai_client_auth");
+  return res.json({ ok: true, redirectTo: "/coach/login" });
+});
+
+// Coach API: Get dashboard stats
+app.get("/api/coach/stats", requireCoachAuth, async (req, res) => {
+  try {
+    const coachId = req.coach.id;
+
+    // Get user count (clients)
+    const usersResult = await db.query(
+      "SELECT COUNT(*) FROM users WHERE app_id = $1",
+      [coachId]
+    );
+    const totalClients = parseInt(usersResult.rows[0].count, 10);
+
+    // Get session count
+    const sessionsResult = await db.query(
+      "SELECT COUNT(*) FROM sessions WHERE app_id = $1",
+      [coachId]
+    );
+    const totalSessions = parseInt(sessionsResult.rows[0].count, 10);
+
+    // Get unique threads (conversations)
+    const threadsResult = await db.query(
+      "SELECT COUNT(DISTINCT thread_id) FROM sessions WHERE app_id = $1",
+      [coachId]
+    );
+    const totalConversations = parseInt(threadsResult.rows[0].count, 10);
+
+    // Get sessions in last 7 days
+    const recentResult = await db.query(
+      `SELECT COUNT(*) FROM sessions
+       WHERE app_id = $1 AND created_at > NOW() - INTERVAL '7 days'`,
+      [coachId]
+    );
+    const sessionsLast7Days = parseInt(recentResult.rows[0].count, 10);
+
+    return res.json({
+      ok: true,
+      data: {
+        totalClients,
+        totalSessions,
+        totalConversations,
+        sessionsLast7Days,
+        appStatus: req.coach.status,
+        chargeUsers: req.coach.charge_users,
+        interactionLimit: req.coach.interaction_limit,
+      },
+    });
+  } catch (err) {
+    console.error("Error in /api/coach/stats:", err);
+    return res.status(500).json({ error: "Failed to fetch stats" });
+  }
+});
+
+// Coach API: Get profile/app info
+app.get("/api/coach/profile", requireCoachAuth, async (req, res) => {
+  try {
+    const coach = req.coach;
+
+    // Get offers
+    const offersResult = await db.query(
+      "SELECT * FROM offers WHERE app_id = $1 ORDER BY display_order",
+      [coach.id]
+    );
+
+    return res.json({
+      ok: true,
+      data: {
+        id: coach.id,
+        businessName: coach.business_name,
+        coachName: coach.coach_name,
+        coachEmail: coach.coach_email,
+        coachPhone: coach.coach_phone,
+        coachingNiche: coach.coaching_niche,
+        targetAudience: coach.target_audience,
+        coachingStyle: coach.coaching_style,
+        coachBio: coach.coach_bio,
+        subdomain: coach.subdomain,
+        customDomain: coach.custom_domain,
+        logoUrl: coach.logo_url,
+        primaryColor: coach.primary_color,
+        secondaryColor: coach.secondary_color,
+        backgroundColor: coach.background_color,
+        status: coach.status,
+        chargeUsers: coach.charge_users,
+        interactionLimit: coach.interaction_limit,
+        hasStripeKeys: !!(coach.coach_stripe_secret_key && coach.coach_stripe_publishable_key),
+        offers: offersResult.rows.map(o => ({
+          id: o.id,
+          title: o.title,
+          description: o.description,
+          ctaText: o.cta_text,
+          ctaUrl: o.cta_url,
+          isActive: o.is_active,
+          showAsCard: o.show_as_card,
+        })),
+      },
+    });
+  } catch (err) {
+    console.error("Error in /api/coach/profile:", err);
+    return res.status(500).json({ error: "Failed to fetch profile" });
+  }
+});
+
+// Coach API: Get clients list
+app.get("/api/coach/clients", requireCoachAuth, async (req, res) => {
+  try {
+    const coachId = req.coach.id;
+
+    const result = await db.query(
+      `SELECT
+        u.id,
+        u.email,
+        u.name,
+        u.created_at,
+        u.holiday_pass_expires_at,
+        (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.app_id = $1) as session_count,
+        (SELECT MAX(created_at) FROM sessions s WHERE s.user_id = u.id AND s.app_id = $1) as last_session
+      FROM users u
+      WHERE u.app_id = $1
+      ORDER BY u.created_at DESC`,
+      [coachId]
+    );
+
+    return res.json({
+      ok: true,
+      data: result.rows.map(r => ({
+        id: r.id,
+        email: r.email,
+        name: r.name,
+        createdAt: r.created_at,
+        accessExpiresAt: r.holiday_pass_expires_at,
+        sessionCount: parseInt(r.session_count, 10),
+        lastSession: r.last_session,
+      })),
+    });
+  } catch (err) {
+    console.error("Error in /api/coach/clients:", err);
+    return res.status(500).json({ error: "Failed to fetch clients" });
+  }
+});
+
+// Coach API: Update profile
+app.put("/api/coach/profile", requireCoachAuth, async (req, res) => {
+  try {
+    const coachId = req.coach.id;
+    const {
+      businessName,
+      coachName,
+      coachPhone,
+      coachingNiche,
+      targetAudience,
+      coachingStyle,
+      coachBio,
+    } = req.body || {};
+
+    await db.query(
+      `UPDATE apps SET
+        business_name = COALESCE($1, business_name),
+        coach_name = COALESCE($2, coach_name),
+        coach_phone = COALESCE($3, coach_phone),
+        coaching_niche = COALESCE($4, coaching_niche),
+        target_audience = COALESCE($5, target_audience),
+        coaching_style = COALESCE($6, coaching_style),
+        coach_bio = COALESCE($7, coach_bio)
+      WHERE id = $8`,
+      [businessName, coachName, coachPhone, coachingNiche, targetAudience, coachingStyle, coachBio, coachId]
+    );
+
+    return res.json({ ok: true, message: "Profile updated" });
+  } catch (err) {
+    console.error("Error in PUT /api/coach/profile:", err);
+    return res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+// Coach API: Update branding
+app.put("/api/coach/branding", requireCoachAuth, async (req, res) => {
+  try {
+    const coachId = req.coach.id;
+    const { primaryColor, secondaryColor, backgroundColor, logoUrl } = req.body || {};
+
+    const updates = [];
+    const values = [coachId];
+    let paramIndex = 1;
+
+    if (primaryColor) {
+      paramIndex++;
+      updates.push(`primary_color = $${paramIndex}`);
+      values.push(primaryColor);
+    }
+
+    if (secondaryColor) {
+      paramIndex++;
+      updates.push(`secondary_color = $${paramIndex}`);
+      values.push(secondaryColor);
+    }
+
+    if (backgroundColor) {
+      paramIndex++;
+      updates.push(`background_color = $${paramIndex}`);
+      values.push(backgroundColor);
+    }
+
+    if (logoUrl) {
+      paramIndex++;
+      updates.push(`logo_url = $${paramIndex}`);
+      values.push(logoUrl);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "No updates provided" });
+    }
+
+    await db.query(
+      `UPDATE apps SET ${updates.join(", ")} WHERE id = $1`,
+      values
+    );
+
+    return res.json({ ok: true, message: "Branding updated" });
+  } catch (err) {
+    console.error("Error in PUT /api/coach/branding:", err);
+    return res.status(500).json({ error: "Failed to update branding" });
+  }
+});
+
+// Coach API: Update settings (Stripe keys, charge users, interaction limit)
+app.put("/api/coach/settings", requireCoachAuth, async (req, res) => {
+  try {
+    const coachId = req.coach.id;
+    const { stripeSecretKey, stripePublishableKey, chargeUsers, interactionLimit } = req.body || {};
+
+    const updates = [];
+    const values = [coachId];
+    let paramIndex = 1;
+
+    if (stripeSecretKey !== undefined) {
+      paramIndex++;
+      updates.push(`coach_stripe_secret_key = $${paramIndex}`);
+      values.push(stripeSecretKey || null);
+    }
+
+    if (stripePublishableKey !== undefined) {
+      paramIndex++;
+      updates.push(`coach_stripe_publishable_key = $${paramIndex}`);
+      values.push(stripePublishableKey || null);
+    }
+
+    if (chargeUsers !== undefined) {
+      paramIndex++;
+      updates.push(`charge_users = $${paramIndex}`);
+      values.push(!!chargeUsers);
+    }
+
+    if (interactionLimit !== undefined) {
+      paramIndex++;
+      updates.push(`interaction_limit = $${paramIndex}`);
+      values.push(parseInt(interactionLimit, 10) || 6);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "No updates provided" });
+    }
+
+    await db.query(
+      `UPDATE apps SET ${updates.join(", ")} WHERE id = $1`,
+      values
+    );
+
+    return res.json({ ok: true, message: "Settings updated" });
+  } catch (err) {
+    console.error("Error in PUT /api/coach/settings:", err);
+    return res.status(500).json({ error: "Failed to update settings" });
+  }
+});
+
+// Coach API: Upload logo (to S3)
+app.post("/api/coach/upload-logo", requireCoachAuth, async (req, res) => {
+  try {
+    // Check if S3 is configured
+    if (!process.env.AWS_S3_BUCKET) {
+      return res.status(500).json({ error: "File uploads not configured" });
+    }
+
+    // This expects a base64 encoded image in the body
+    const { image, filename, contentType } = req.body || {};
+
+    if (!image || !filename) {
+      return res.status(400).json({ error: "Image and filename are required" });
+    }
+
+    // Decode base64
+    const buffer = Buffer.from(image.replace(/^data:image\/\w+;base64,/, ""), "base64");
+
+    // Generate unique filename
+    const ext = path.extname(filename) || ".png";
+    const key = `logos/${req.coach.id}/${Date.now()}${ext}`;
+
+    // Upload to S3
+    const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+    const s3 = new S3Client({ region: process.env.AWS_REGION || "us-east-2" });
+
+    await s3.send(new PutObjectCommand({
+      Bucket: process.env.AWS_S3_BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType || "image/png",
+    }));
+
+    const logoUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION || "us-east-2"}.amazonaws.com/${key}`;
+
+    // Update the app with new logo URL
+    await db.query("UPDATE apps SET logo_url = $1 WHERE id = $2", [logoUrl, req.coach.id]);
+
+    return res.json({ ok: true, logoUrl });
+  } catch (err) {
+    console.error("Error in /api/coach/upload-logo:", err);
+    return res.status(500).json({ error: "Failed to upload logo" });
+  }
+});
+
+// Coach API: Manage offers
+app.get("/api/coach/offers", requireCoachAuth, async (req, res) => {
+  try {
+    const result = await db.query(
+      "SELECT * FROM offers WHERE app_id = $1 ORDER BY display_order",
+      [req.coach.id]
+    );
+
+    return res.json({
+      ok: true,
+      data: result.rows.map(o => ({
+        id: o.id,
+        title: o.title,
+        description: o.description,
+        ctaText: o.cta_text,
+        ctaUrl: o.cta_url,
+        isActive: o.is_active,
+        showAsCard: o.show_as_card,
+        displayOrder: o.display_order,
+      })),
+    });
+  } catch (err) {
+    console.error("Error in GET /api/coach/offers:", err);
+    return res.status(500).json({ error: "Failed to fetch offers" });
+  }
+});
+
+app.post("/api/coach/offers", requireCoachAuth, async (req, res) => {
+  try {
+    const { title, description, ctaText, ctaUrl, isActive, showAsCard } = req.body || {};
+
+    if (!title) {
+      return res.status(400).json({ error: "Title is required" });
+    }
+
+    // Get next display order
+    const orderResult = await db.query(
+      "SELECT COALESCE(MAX(display_order), 0) + 1 as next_order FROM offers WHERE app_id = $1",
+      [req.coach.id]
+    );
+
+    const result = await db.query(
+      `INSERT INTO offers (app_id, title, description, cta_text, cta_url, is_active, show_as_card, display_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [req.coach.id, title, description, ctaText, ctaUrl, isActive !== false, showAsCard !== false, orderResult.rows[0].next_order]
+    );
+
+    return res.json({ ok: true, offer: result.rows[0] });
+  } catch (err) {
+    console.error("Error in POST /api/coach/offers:", err);
+    return res.status(500).json({ error: "Failed to create offer" });
+  }
+});
+
+app.put("/api/coach/offers/:id", requireCoachAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, ctaText, ctaUrl, isActive, showAsCard } = req.body || {};
+
+    const result = await db.query(
+      `UPDATE offers SET
+        title = COALESCE($1, title),
+        description = COALESCE($2, description),
+        cta_text = COALESCE($3, cta_text),
+        cta_url = COALESCE($4, cta_url),
+        is_active = COALESCE($5, is_active),
+        show_as_card = COALESCE($6, show_as_card)
+      WHERE id = $7 AND app_id = $8
+      RETURNING *`,
+      [title, description, ctaText, ctaUrl, isActive, showAsCard, id, req.coach.id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Offer not found" });
+    }
+
+    return res.json({ ok: true, offer: result.rows[0] });
+  } catch (err) {
+    console.error("Error in PUT /api/coach/offers/:id:", err);
+    return res.status(500).json({ error: "Failed to update offer" });
+  }
+});
+
+app.delete("/api/coach/offers/:id", requireCoachAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      "DELETE FROM offers WHERE id = $1 AND app_id = $2 RETURNING id",
+      [id, req.coach.id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Offer not found" });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("Error in DELETE /api/coach/offers/:id:", err);
+    return res.status(500).json({ error: "Failed to delete offer" });
+  }
+});
+
+// Grant client access (for coaches who charge users)
+app.post("/api/coach/grant-access", requireCoachAuth, async (req, res) => {
+  try {
+    const { email, name, days } = req.body || {};
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const accessDays = parseInt(days, 10) || 30;
+    const expiresAt = new Date(Date.now() + accessDays * 24 * 60 * 60 * 1000);
+
+    // Find or create user
+    const normalizedEmail = email.toLowerCase().trim();
+    let userResult = await db.query(
+      "SELECT * FROM users WHERE email = $1 AND app_id = $2",
+      [normalizedEmail, req.coach.id]
+    );
+
+    if (userResult.rows.length === 0) {
+      // Create new user
+      userResult = await db.query(
+        `INSERT INTO users (email, name, app_id, holiday_pass_expires_at)
+         VALUES ($1, $2, $3, $4)
+         RETURNING *`,
+        [normalizedEmail, name || null, req.coach.id, expiresAt]
+      );
+    } else {
+      // Update existing user's access
+      userResult = await db.query(
+        `UPDATE users SET holiday_pass_expires_at = $1
+         WHERE id = $2
+         RETURNING *`,
+        [expiresAt, userResult.rows[0].id]
+      );
+    }
+
+    return res.json({
+      ok: true,
+      user: {
+        id: userResult.rows[0].id,
+        email: userResult.rows[0].email,
+        accessExpiresAt: expiresAt,
+      },
+    });
+  } catch (err) {
+    console.error("Error in POST /api/coach/grant-access:", err);
+    return res.status(500).json({ error: "Failed to grant access" });
   }
 });
 
@@ -1823,7 +2408,7 @@ app.post("/auth/client/login", async (req, res) => {
       maxAge: 30 * 24 * 60 * 60 * 1000
     })
 
-    return res.json({ ok: true, redirectTo: '/platform/dashboard' })
+    return res.json({ ok: true, redirectTo: '/my-app' })
   } catch (err) {
     console.error('Error in /auth/client/login:', err)
     return res.status(500).json({ error: 'Login failed. Please try again.' })
@@ -4438,6 +5023,7 @@ app.get("/api/platform/coaches/:id", requireAuth, requirePlatformAdmin, async (r
       logoUrl: app.logo_url,
       primaryColor: app.primary_color,
       secondaryColor: app.secondary_color,
+      backgroundColor: app.background_color,
       coachingNiche: app.coaching_niche,
       targetAudience: app.target_audience,
       coachingStyle: app.coaching_style,

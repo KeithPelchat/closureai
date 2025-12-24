@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Settings - My App - ClosureAI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+  <style>
+    /* Coach dashboard overrides */
+    .admin-badge {
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+    }
+
+    .admin-sidebar-brand-mark {
+      background: linear-gradient(135deg, #22c55e, #4ade80);
+    }
+
+    .admin-nav-item.active {
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      border-left-color: #22c55e;
+    }
+
+    .settings-section {
+      margin-bottom: 32px;
+    }
+
+    .settings-section h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin: 0 0 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #334155;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+
+    .form-hint {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 6px;
+    }
+
+    .form-input {
+      width: 100%;
+      max-width: 500px;
+      padding: 12px 14px;
+      font-size: 14px;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #e2e8f0;
+      outline: none;
+    }
+
+    .form-input:focus {
+      border-color: #22c55e;
+    }
+
+    .form-input:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 48px;
+      height: 24px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #334155;
+      transition: 0.3s;
+      border-radius: 24px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: #e2e8f0;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+      background-color: #22c55e;
+    }
+
+    .toggle-switch input:checked + .toggle-slider:before {
+      transform: translateX(24px);
+    }
+
+    .toggle-label {
+      font-size: 14px;
+      color: #e2e8f0;
+    }
+
+    .btn-save {
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      background: #22c55e;
+      color: #020617;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn-save:hover {
+      opacity: 0.9;
+    }
+
+    .btn-save:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .save-message {
+      display: inline-block;
+      margin-left: 16px;
+      font-size: 14px;
+      color: #4ade80;
+    }
+
+    .stripe-info {
+      background: rgba(14, 165, 233, 0.1);
+      border: 1px solid rgba(14, 165, 233, 0.3);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    .stripe-info a {
+      color: #38bdf8;
+    }
+
+    .stripe-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .stripe-status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .stripe-status-dot.connected {
+      background: #22c55e;
+    }
+
+    .stripe-status-dot.not-connected {
+      background: #ef4444;
+    }
+
+    .interaction-limit-input {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .interaction-limit-input input {
+      width: 80px;
+      text-align: center;
+    }
+
+    .interaction-limit-input span {
+      font-size: 14px;
+      color: #94a3b8;
+    }
+
+    .offers-list {
+      margin-top: 16px;
+    }
+
+    .offer-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+
+    .offer-item-content {
+      flex: 1;
+    }
+
+    .offer-item-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #e2e8f0;
+    }
+
+    .offer-item-url {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .offer-item-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-icon {
+      padding: 6px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+    }
+
+    .btn-icon:hover {
+      background: #1e293b;
+      color: #e2e8f0;
+    }
+
+    .btn-icon.delete:hover {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+    }
+
+    .btn-add-offer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      border: 1px dashed #334155;
+      border-radius: 8px;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      width: 100%;
+      justify-content: center;
+    }
+
+    .btn-add-offer:hover {
+      border-color: #22c55e;
+      color: #4ade80;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 24px;
+      width: 100%;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin: 0 0 20px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 24px;
+    }
+
+    .btn-cancel {
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+    }
+
+    .btn-cancel:hover {
+      background: #0f172a;
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <a href="/my-app" class="admin-sidebar-brand">
+          <div class="admin-sidebar-brand-mark"></div>
+          <div>
+            <div class="admin-sidebar-title">ClosureAI</div>
+            <div class="admin-badge">My App</div>
+          </div>
+        </a>
+      </div>
+
+      <nav class="admin-sidebar-nav">
+        <a href="/my-app" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="9"/>
+            <rect x="14" y="3" width="7" height="5"/>
+            <rect x="14" y="12" width="7" height="9"/>
+            <rect x="3" y="16" width="7" height="5"/>
+          </svg>
+          Dashboard
+        </a>
+        <a href="/my-app/settings" class="admin-nav-item active">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          Settings
+        </a>
+        <a href="/my-app/branding" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="13.5" cy="6.5" r=".5"/>
+            <circle cx="17.5" cy="10.5" r=".5"/>
+            <circle cx="8.5" cy="7.5" r=".5"/>
+            <circle cx="6.5" cy="12.5" r=".5"/>
+            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 6.012 17.461 2 12 2z"/>
+          </svg>
+          Branding
+        </a>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <button type="button" class="admin-back-link" id="logout-btn" style="background:none;border:none;color:inherit;cursor:pointer;width:100%;text-align:left;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-header">
+        <h1 class="admin-header-title">Settings</h1>
+      </header>
+
+      <div class="admin-content">
+        <!-- Client Access Settings -->
+        <div class="admin-card settings-section">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Client Access</h2>
+          </div>
+          <div class="admin-card-body">
+            <div class="form-group">
+              <div class="toggle-container">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="charge-users" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label">Charge users for access</span>
+              </div>
+              <p class="form-hint">When enabled, users need a paid subscription or manual access grant to use your app.</p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Interaction Limit (per session)</label>
+              <div class="interaction-limit-input">
+                <input type="number" class="form-input" id="interaction-limit" min="1" max="20" value="6" />
+                <span>AI turns per conversation</span>
+              </div>
+              <p class="form-hint">How many AI responses before the session wraps up. Default is 6.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stripe Settings -->
+        <div class="admin-card settings-section">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Stripe Integration</h2>
+          </div>
+          <div class="admin-card-body">
+            <div class="stripe-info">
+              To charge your clients, connect your own Stripe account.
+              <a href="https://dashboard.stripe.com/apikeys" target="_blank">Get your API keys from Stripe Dashboard</a>.
+              Payments go directly to your account.
+            </div>
+
+            <div class="stripe-status">
+              <div class="stripe-status-dot" id="stripe-status-dot"></div>
+              <span id="stripe-status-text">Checking...</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Publishable Key</label>
+              <input type="text" class="form-input" id="stripe-pk" placeholder="pk_live_..." autocomplete="off" />
+              <p class="form-hint">Your Stripe publishable key (starts with pk_)</p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Secret Key</label>
+              <input type="password" class="form-input" id="stripe-sk" placeholder="sk_live_..." autocomplete="off" />
+              <p class="form-hint">Your Stripe secret key (starts with sk_) - stored securely</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Offers Section -->
+        <div class="admin-card settings-section">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Offers & CTAs</h2>
+          </div>
+          <div class="admin-card-body">
+            <p style="color: #94a3b8; font-size: 14px; margin: 0 0 16px;">
+              Add offers that can be mentioned by the AI and shown to clients as cards.
+            </p>
+            <div id="offers-list" class="offers-list"></div>
+            <button type="button" class="btn-add-offer" id="add-offer-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Add Offer
+            </button>
+          </div>
+        </div>
+
+        <div style="margin-top: 24px;">
+          <button type="button" class="btn-save" id="save-settings-btn">Save Settings</button>
+          <span class="save-message" id="save-message"></span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Offer Modal -->
+  <div class="modal-overlay" id="offer-modal">
+    <div class="modal">
+      <h3 id="modal-title">Add Offer</h3>
+      <input type="hidden" id="offer-id" />
+
+      <div class="form-group">
+        <label class="form-label">Title</label>
+        <input type="text" class="form-input" id="offer-title" placeholder="e.g., Book a Strategy Call" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input type="text" class="form-input" id="offer-description" placeholder="Brief description of the offer" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">CTA Text</label>
+        <input type="text" class="form-input" id="offer-cta-text" placeholder="e.g., Book Now" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">CTA URL</label>
+        <input type="url" class="form-input" id="offer-cta-url" placeholder="https://..." />
+      </div>
+
+      <div class="form-group">
+        <div class="toggle-container">
+          <label class="toggle-switch">
+            <input type="checkbox" id="offer-show-card" checked />
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">Show as card in wrap-up</span>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" id="cancel-offer-btn">Cancel</button>
+        <button type="button" class="btn-save" id="save-offer-btn">Save Offer</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let profile = null;
+    let offers = [];
+
+    // Load profile
+    async function loadProfile() {
+      try {
+        const res = await fetch('/api/coach/profile');
+        const data = await res.json();
+
+        if (data.ok && data.data) {
+          profile = data.data;
+
+          document.getElementById('charge-users').checked = profile.chargeUsers;
+          document.getElementById('interaction-limit').value = profile.interactionLimit || 6;
+
+          // Stripe status
+          const dotEl = document.getElementById('stripe-status-dot');
+          const textEl = document.getElementById('stripe-status-text');
+          if (profile.hasStripeKeys) {
+            dotEl.classList.add('connected');
+            dotEl.classList.remove('not-connected');
+            textEl.textContent = 'Stripe connected';
+          } else {
+            dotEl.classList.add('not-connected');
+            dotEl.classList.remove('connected');
+            textEl.textContent = 'Stripe not connected';
+          }
+
+          offers = profile.offers || [];
+          renderOffers();
+        }
+      } catch (err) {
+        console.error('Failed to load profile:', err);
+      }
+    }
+
+    // Render offers
+    function renderOffers() {
+      const container = document.getElementById('offers-list');
+      if (!offers.length) {
+        container.innerHTML = '<p style="color: #64748b; font-size: 14px;">No offers yet.</p>';
+        return;
+      }
+
+      container.innerHTML = offers.map(o => `
+        <div class="offer-item">
+          <div class="offer-item-content">
+            <div class="offer-item-title">${escapeHtml(o.title)}</div>
+            <div class="offer-item-url">${escapeHtml(o.ctaUrl || '')}</div>
+          </div>
+          <div class="offer-item-actions">
+            <button type="button" class="btn-icon" onclick="editOffer('${o.id}')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+            <button type="button" class="btn-icon delete" onclick="deleteOffer('${o.id}')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+
+    // Save settings
+    document.getElementById('save-settings-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('save-settings-btn');
+      const msgEl = document.getElementById('save-message');
+      btn.disabled = true;
+      msgEl.textContent = '';
+
+      try {
+        const chargeUsers = document.getElementById('charge-users').checked;
+        const interactionLimit = document.getElementById('interaction-limit').value;
+        const stripeSecretKey = document.getElementById('stripe-sk').value.trim();
+        const stripePublishableKey = document.getElementById('stripe-pk').value.trim();
+
+        const body = {
+          chargeUsers,
+          interactionLimit: parseInt(interactionLimit, 10),
+        };
+
+        // Only include Stripe keys if they were entered
+        if (stripeSecretKey) body.stripeSecretKey = stripeSecretKey;
+        if (stripePublishableKey) body.stripePublishableKey = stripePublishableKey;
+
+        const res = await fetch('/api/coach/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        const data = await res.json();
+
+        if (data.ok) {
+          msgEl.textContent = 'Settings saved!';
+          msgEl.style.color = '#4ade80';
+          // Clear Stripe key inputs after save
+          document.getElementById('stripe-sk').value = '';
+          document.getElementById('stripe-pk').value = '';
+          loadProfile();
+        } else {
+          msgEl.textContent = data.error || 'Failed to save.';
+          msgEl.style.color = '#f87171';
+        }
+      } catch (err) {
+        msgEl.textContent = 'Network error.';
+        msgEl.style.color = '#f87171';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // Offer modal
+    const modal = document.getElementById('offer-modal');
+    const addOfferBtn = document.getElementById('add-offer-btn');
+    const cancelOfferBtn = document.getElementById('cancel-offer-btn');
+    const saveOfferBtn = document.getElementById('save-offer-btn');
+
+    addOfferBtn.addEventListener('click', () => {
+      document.getElementById('modal-title').textContent = 'Add Offer';
+      document.getElementById('offer-id').value = '';
+      document.getElementById('offer-title').value = '';
+      document.getElementById('offer-description').value = '';
+      document.getElementById('offer-cta-text').value = '';
+      document.getElementById('offer-cta-url').value = '';
+      document.getElementById('offer-show-card').checked = true;
+      modal.classList.add('show');
+    });
+
+    cancelOfferBtn.addEventListener('click', () => {
+      modal.classList.remove('show');
+    });
+
+    window.editOffer = function(id) {
+      const offer = offers.find(o => o.id === id);
+      if (!offer) return;
+
+      document.getElementById('modal-title').textContent = 'Edit Offer';
+      document.getElementById('offer-id').value = offer.id;
+      document.getElementById('offer-title').value = offer.title || '';
+      document.getElementById('offer-description').value = offer.description || '';
+      document.getElementById('offer-cta-text').value = offer.ctaText || '';
+      document.getElementById('offer-cta-url').value = offer.ctaUrl || '';
+      document.getElementById('offer-show-card').checked = offer.showAsCard !== false;
+      modal.classList.add('show');
+    };
+
+    window.deleteOffer = async function(id) {
+      if (!confirm('Delete this offer?')) return;
+
+      try {
+        const res = await fetch(`/api/coach/offers/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+          offers = offers.filter(o => o.id !== id);
+          renderOffers();
+        } else {
+          alert(data.error || 'Failed to delete offer.');
+        }
+      } catch (err) {
+        alert('Network error.');
+      }
+    };
+
+    saveOfferBtn.addEventListener('click', async () => {
+      const id = document.getElementById('offer-id').value;
+      const title = document.getElementById('offer-title').value.trim();
+      const description = document.getElementById('offer-description').value.trim();
+      const ctaText = document.getElementById('offer-cta-text').value.trim();
+      const ctaUrl = document.getElementById('offer-cta-url').value.trim();
+      const showAsCard = document.getElementById('offer-show-card').checked;
+
+      if (!title) {
+        alert('Title is required.');
+        return;
+      }
+
+      saveOfferBtn.disabled = true;
+
+      try {
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? `/api/coach/offers/${id}` : '/api/coach/offers';
+
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, description, ctaText, ctaUrl, showAsCard }),
+        });
+
+        const data = await res.json();
+
+        if (data.ok) {
+          modal.classList.remove('show');
+          loadProfile();
+        } else {
+          alert(data.error || 'Failed to save offer.');
+        }
+      } catch (err) {
+        alert('Network error.');
+      } finally {
+        saveOfferBtn.disabled = false;
+      }
+    });
+
+    // Logout
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      const res = await fetch('/coach/logout', { method: 'POST' });
+      const data = await res.json();
+      if (data.redirectTo) window.location.href = data.redirectTo;
+    });
+
+    // Initialize
+    loadProfile();
+  </script>
+</body>
+</html>
