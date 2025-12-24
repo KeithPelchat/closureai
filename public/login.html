@@ -575,10 +575,10 @@
             // Switch to sign in mode
             setTimeout(() => setAuthMode('signin'), 2000)
           } else {
-            // Login successful - redirect
+            // Login successful - redirect (admins go to /platform)
             statusEl.textContent = 'Success! Redirecting...'
             statusEl.className = 'auth-status auth-status--ok'
-            window.location.href = '/'
+            window.location.href = data.redirectTo || '/'
           }
         } catch (err) {
           console.error('Auth error:', err)

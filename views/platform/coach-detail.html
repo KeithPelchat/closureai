@@ -208,6 +208,19 @@
                 `).join('') : '<p style="color: #64748b;">No offers configured</p>'}
               </div>
             </div>
+
+            <!-- Prompts (full width in main area) -->
+            <div class="admin-card">
+              <div class="admin-card-header">
+                <h2 class="admin-card-title">System Prompt</h2>
+                <button class="btn-admin btn-admin-ghost" style="font-size: 12px; padding: 4px 8px;" onclick="openPromptModal()">+ New Version</button>
+              </div>
+              <div class="admin-card-body" id="prompts-container">
+                <div class="admin-loading" style="padding: 20px 0;">
+                  <div class="admin-spinner"></div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="coach-detail-side">
@@ -253,6 +266,9 @@
           </div>
         </div>
       `;
+
+      // Load prompts after rendering
+      loadPrompts();
     }
 
     async function approveCoach() {
@@ -450,6 +466,207 @@
       }
     }
 
+    // Prompt management functions
+    let promptsData = [];
+
+    async function loadPrompts() {
+      const container = document.getElementById('prompts-container');
+      try {
+        const response = await adminFetch(`/api/admin/clients/${coachId}/prompts`);
+        promptsData = response.prompts || [];
+
+        if (promptsData.length === 0) {
+          container.innerHTML = `
+            <p style="color: #64748b; margin-bottom: 12px;">No custom prompts configured.</p>
+            <p style="font-size: 12px; color: #94a3b8;">Using default coach template.</p>
+          `;
+          return;
+        }
+
+        const activePrompt = promptsData.find(p => p.is_active);
+        const historyPrompts = promptsData.filter(p => !p.is_active);
+
+        container.innerHTML = `
+          ${activePrompt ? `
+          <div class="prompt-item active-prompt">
+            <div class="prompt-header">
+              <span class="prompt-version">v${activePrompt.version}</span>
+              <span class="prompt-badge active">Active</span>
+              <button class="btn-link" onclick="viewPrompt('${activePrompt.id}')">View Full</button>
+            </div>
+            <pre class="prompt-preview-large">${escapeHtml(activePrompt.content.substring(0, 500))}${activePrompt.content.length > 500 ? '...' : ''}</pre>
+            <div class="prompt-meta">
+              ${activePrompt.created_at ? `<span>Created: ${formatDateTime(activePrompt.created_at)}</span>` : ''}
+              <span>${activePrompt.content.length.toLocaleString()} characters</span>
+            </div>
+          </div>
+          ` : '<p style="color: #64748b;">No active prompt. Using default coach template.</p>'}
+
+          ${historyPrompts.length > 0 ? `
+          <div class="prompt-history">
+            <h4 style="font-size: 12px; font-weight: 600; color: #64748b; margin: 16px 0 8px 0;">Version History (${historyPrompts.length})</h4>
+            ${historyPrompts.map(p => `
+              <div class="prompt-item history-prompt">
+                <div class="prompt-header">
+                  <span class="prompt-version">v${p.version}</span>
+                  <div>
+                    <button class="btn-link" onclick="viewPrompt('${p.id}')" style="margin-right: 12px;">View</button>
+                    <button class="btn-link" onclick="activatePrompt('${p.id}')">Activate</button>
+                  </div>
+                </div>
+                <p class="prompt-preview">${escapeHtml(p.content.substring(0, 120))}${p.content.length > 120 ? '...' : ''}</p>
+                <div class="prompt-meta">
+                  ${p.created_at ? `<span>${formatDateTime(p.created_at)}</span>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          ` : ''}
+        `;
+      } catch (err) {
+        console.error('Failed to load prompts:', err);
+        container.innerHTML = '<p style="color: #ef4444;">Failed to load prompts</p>';
+      }
+    }
+
+    function viewPrompt(promptId) {
+      const prompt = promptsData.find(p => p.id === promptId);
+      if (!prompt) return;
+
+      const modal = document.createElement('div');
+      modal.id = 'view-prompt-modal';
+      modal.className = 'admin-modal-overlay';
+      modal.innerHTML = `
+        <div class="admin-modal" style="max-width: 700px;">
+          <div class="admin-modal-header">
+            <h2 class="admin-modal-title">Prompt v${prompt.version} ${prompt.is_active ? '<span class="prompt-badge active">Active</span>' : ''}</h2>
+            <button class="admin-modal-close" onclick="closeViewPromptModal()">&times;</button>
+          </div>
+          <div class="admin-modal-body" style="max-height: 60vh; overflow-y: auto;">
+            <pre style="white-space: pre-wrap; word-wrap: break-word; font-family: monospace; font-size: 13px; background: #f8fafc; padding: 16px; border-radius: 8px; margin: 0;">${escapeHtml(prompt.content)}</pre>
+          </div>
+          <div class="admin-modal-footer">
+            ${!prompt.is_active ? `<button type="button" class="btn-admin btn-admin-primary" onclick="activatePrompt('${prompt.id}'); closeViewPromptModal();">Activate This Version</button>` : ''}
+            <button type="button" class="btn-admin btn-admin-ghost" onclick="closeViewPromptModal()">Close</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      setTimeout(() => modal.classList.add('open'), 10);
+    }
+
+    function closeViewPromptModal() {
+      const modal = document.getElementById('view-prompt-modal');
+      if (modal) {
+        modal.classList.remove('open');
+        setTimeout(() => modal.remove(), 200);
+      }
+    }
+
+    let defaultTemplate = null;
+
+    async function loadDefaultTemplate() {
+      if (defaultTemplate) return defaultTemplate;
+      try {
+        const response = await adminFetch('/api/admin/prompt-template');
+        defaultTemplate = response.template || '';
+        return defaultTemplate;
+      } catch (err) {
+        console.error('Failed to load default template:', err);
+        return '';
+      }
+    }
+
+    async function openPromptModal() {
+      const activePrompt = promptsData.find(p => p.is_active);
+      let currentContent = activePrompt ? activePrompt.content : (coachData.customSystemPrompt || '');
+
+      // If no existing content, load the default template
+      if (!currentContent) {
+        currentContent = await loadDefaultTemplate();
+      }
+
+      const modal = document.createElement('div');
+      modal.id = 'prompt-modal';
+      modal.className = 'admin-modal-overlay';
+      modal.innerHTML = `
+        <div class="admin-modal" style="max-width: 900px;">
+          <div class="admin-modal-header">
+            <h2 class="admin-modal-title">Create New Prompt Version</h2>
+            <button class="admin-modal-close" onclick="closePromptModal()">&times;</button>
+          </div>
+          <div class="admin-modal-body">
+            <p style="font-size: 13px; color: #64748b; margin-bottom: 16px;">
+              ${activePrompt || coachData.customSystemPrompt ? 'Edit the system prompt below.' : 'Starting with the default template. Customize it for this coach.'}
+            </p>
+            <div class="form-group">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label class="form-label">System Prompt</label>
+                <button type="button" class="btn-link" onclick="resetToDefaultTemplate()" style="font-size: 11px;">Reset to Default Template</button>
+              </div>
+              <textarea id="new-prompt-content" class="form-input" rows="20" style="font-family: monospace; font-size: 13px;">${escapeHtml(currentContent)}</textarea>
+            </div>
+          </div>
+          <div class="admin-modal-footer">
+            <button type="button" class="btn-admin btn-admin-ghost" onclick="closePromptModal()">Cancel</button>
+            <button type="button" class="btn-admin btn-admin-primary" onclick="saveNewPrompt()">Save as New Version</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      setTimeout(() => modal.classList.add('open'), 10);
+    }
+
+    async function resetToDefaultTemplate() {
+      const template = await loadDefaultTemplate();
+      const textarea = document.getElementById('new-prompt-content');
+      if (textarea && template) {
+        textarea.value = template;
+        showToast('Reset to default template');
+      }
+    }
+
+    function closePromptModal() {
+      const modal = document.getElementById('prompt-modal');
+      if (modal) {
+        modal.classList.remove('open');
+        setTimeout(() => modal.remove(), 200);
+      }
+    }
+
+    async function saveNewPrompt() {
+      const content = document.getElementById('new-prompt-content').value.trim();
+      if (!content) {
+        showToast('Prompt content is required', 'error');
+        return;
+      }
+
+      try {
+        await adminFetch(`/api/admin/clients/${coachId}/prompt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content })
+        });
+        showToast('New prompt version created and activated');
+        closePromptModal();
+        loadPrompts();
+      } catch (err) {
+        showToast('Failed to save prompt: ' + err.message, 'error');
+      }
+    }
+
+    async function activatePrompt(promptId) {
+      try {
+        await adminFetch(`/api/admin/prompts/${promptId}/activate`, {
+          method: 'PUT'
+        });
+        showToast('Prompt version activated');
+        loadPrompts();
+      } catch (err) {
+        showToast('Failed to activate prompt: ' + err.message, 'error');
+      }
+    }
+
     loadCoach();
   </script>
 
@@ -490,6 +707,84 @@
       .form-grid {
         grid-template-columns: 1fr;
       }
+    }
+
+    /* Prompt styles */
+    .prompt-item {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .prompt-item.active-prompt {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+    }
+    .prompt-item.history-prompt {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+    }
+    .prompt-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .prompt-version {
+      font-weight: 600;
+      font-size: 13px;
+      color: #0f172a;
+    }
+    .prompt-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+    .prompt-badge.active {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .prompt-preview {
+      font-size: 12px;
+      color: #475569;
+      line-height: 1.5;
+      margin: 0 0 8px 0;
+      font-family: monospace;
+    }
+    .prompt-preview-large {
+      font-size: 12px;
+      color: #475569;
+      line-height: 1.6;
+      margin: 0 0 12px 0;
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      background: #f8fafc;
+      padding: 12px;
+      border-radius: 6px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .prompt-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+    .btn-link {
+      background: none;
+      border: none;
+      color: #0ea5e9;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 0;
+    }
+    .btn-link:hover {
+      text-decoration: underline;
+    }
+    .prompt-history {
+      margin-top: 8px;
     }
   </style>
 </body>

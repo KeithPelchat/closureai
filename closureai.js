@@ -609,7 +609,18 @@ async function getAppProfile(appId) {
   );
 
   if (result.rows.length > 0) {
-    return result.rows[0];
+    const app = result.rows[0];
+
+    // Fetch active prompt from prompts table (takes precedence over custom_system_prompt)
+    const promptResult = await db.query(
+      `SELECT content FROM prompts WHERE app_id = $1 AND is_active = true LIMIT 1`,
+      [appId]
+    );
+    if (promptResult.rows.length > 0) {
+      app.active_prompt = promptResult.rows[0].content;
+    }
+
+    return app;
   }
 
   return null;
@@ -2122,7 +2133,7 @@ app.post("/auth/login", async (req, res) => {
     const appId = req.tenant?.id || APP_ID
 
     const result = await db.query(
-      'SELECT id, password_hash, email_verified, name, status FROM users WHERE app_id = $1 AND email = $2',
+      'SELECT id, password_hash, email_verified, name, status, is_admin FROM users WHERE app_id = $1 AND email = $2',
       [appId, normalizedEmail]
     )
 
@@ -2171,7 +2182,10 @@ app.post("/auth/login", async (req, res) => {
 
     res.cookie('closureai_auth', jwtToken, cookieOptions)
 
-    return res.json({ ok: true, user: { id: user.id, name: user.name } })
+    // Redirect admins to platform dashboard
+    const redirectTo = user.is_admin ? '/platform' : '/'
+
+    return res.json({ ok: true, user: { id: user.id, name: user.name, isAdmin: user.is_admin || false }, redirectTo })
   } catch (err) {
     console.error('Error in /auth/login:', err)
     return res.status(500).json({ error: 'Login failed. Please try again.' })
@@ -2891,15 +2905,19 @@ app.get("/auth/google/callback", async (req, res) => {
 
     res.cookie("closureai_auth", jwtToken, cookieOptions);
 
-    // Redirect back to the originating tenant subdomain
-    let redirectUrl = "/";
+    // Check if user is admin for redirect
+    const isAdmin = user.is_admin || false;
+
+    // Redirect back to the originating tenant subdomain (admins go to /platform)
+    let redirectUrl = isAdmin ? "/platform" : "/";
     if (returnHost && returnHost !== "getclosureai.com" && returnHost.endsWith(".getclosureai.com")) {
-      redirectUrl = `https://${returnHost}/`;
+      redirectUrl = `https://${returnHost}${isAdmin ? '/platform' : '/'}`;
     }
 
     console.log(
       "[Google OAuth] Login complete for",
       email,
+      isAdmin ? "(admin)" : "",
       "→ redirecting to",
       redirectUrl
     );
@@ -3299,9 +3317,20 @@ app.post("/api/ai/closure", requireAuth, async (req, res) => {
     // Use tenant from middleware if available, otherwise fall back to global APP_ID
     // -----------------------------
     const effectiveAppId = req.tenant?.id || APP_ID;
-    const appProfile = req.tenant || await getAppProfile(effectiveAppId);
+    let appProfile = req.tenant || await getAppProfile(effectiveAppId);
     const offers = await getOffersForApp(effectiveAppId);
     const coachName = appProfile?.coach_name || "your coach";
+
+    // Fetch active prompt from prompts table (if not already loaded via getAppProfile)
+    if (appProfile && !appProfile.active_prompt) {
+      const promptResult = await db.query(
+        `SELECT content FROM prompts WHERE app_id = $1 AND is_active = true LIMIT 1`,
+        [effectiveAppId]
+      );
+      if (promptResult.rows.length > 0) {
+        appProfile = { ...appProfile, active_prompt: promptResult.rows[0].content };
+      }
+    }
 
     // -----------------------------
     // Call OpenAI with coach-specific prompt and offer context
@@ -4610,6 +4639,238 @@ app.get("/api/admin/commissions/summary", requireAdmin, async (req, res) => {
   } catch (err) {
     console.error("Error in /api/admin/commissions/summary:", err);
     return res.status(500).json({ error: "Failed to fetch commission summary" });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Admin Prompt Management
+// ---------------------------------------------------------------------
+
+// Get prompts for a client (with version history)
+app.get("/api/admin/clients/:clientId/prompts", requireAdmin, async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    // Verify client exists
+    const clientResult = await db.query(
+      "SELECT id, business_name, coach_name FROM apps WHERE id = $1",
+      [clientId]
+    );
+
+    if (clientResult.rows.length === 0) {
+      return res.status(404).json({ error: "Client not found" });
+    }
+
+    // Get all prompts for this client (last 5 versions)
+    const promptsResult = await db.query(
+      `SELECT id, version, prompt_text, is_active, notes, created_at, created_by
+       FROM prompts
+       WHERE app_id = $1
+       ORDER BY version DESC
+       LIMIT 5`,
+      [clientId]
+    );
+
+    return res.json({
+      ok: true,
+      data: {
+        client: clientResult.rows[0],
+        prompts: promptsResult.rows.map(p => ({
+          id: p.id,
+          version: p.version,
+          promptText: p.prompt_text,
+          isActive: p.is_active,
+          notes: p.notes,
+          createdAt: p.created_at,
+          createdBy: p.created_by,
+        })),
+      },
+    });
+  } catch (err) {
+    console.error("Error in GET /api/admin/clients/:clientId/prompts:", err);
+    return res.status(500).json({ error: "Failed to fetch prompts" });
+  }
+});
+
+// Get active prompt for a client
+app.get("/api/admin/clients/:clientId/prompt", requireAdmin, async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    const result = await db.query(
+      `SELECT p.id, p.version, p.prompt_text, p.is_active, p.notes, p.created_at,
+              a.business_name, a.coach_name
+       FROM prompts p
+       JOIN apps a ON a.id = p.app_id
+       WHERE p.app_id = $1 AND p.is_active = true`,
+      [clientId]
+    );
+
+    if (result.rows.length === 0) {
+      // No active prompt, return client info with empty prompt
+      const clientResult = await db.query(
+        "SELECT id, business_name, coach_name, custom_system_prompt FROM apps WHERE id = $1",
+        [clientId]
+      );
+
+      if (clientResult.rows.length === 0) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      return res.json({
+        ok: true,
+        data: {
+          client: {
+            id: clientResult.rows[0].id,
+            businessName: clientResult.rows[0].business_name,
+            coachName: clientResult.rows[0].coach_name,
+          },
+          prompt: null,
+          legacyPrompt: clientResult.rows[0].custom_system_prompt || null,
+        },
+      });
+    }
+
+    const row = result.rows[0];
+    return res.json({
+      ok: true,
+      data: {
+        client: {
+          id: clientId,
+          businessName: row.business_name,
+          coachName: row.coach_name,
+        },
+        prompt: {
+          id: row.id,
+          version: row.version,
+          promptText: row.prompt_text,
+          isActive: row.is_active,
+          notes: row.notes,
+          createdAt: row.created_at,
+        },
+      },
+    });
+  } catch (err) {
+    console.error("Error in GET /api/admin/clients/:clientId/prompt:", err);
+    return res.status(500).json({ error: "Failed to fetch prompt" });
+  }
+});
+
+// Create new prompt version for a client
+app.post("/api/admin/clients/:clientId/prompt", requireAdmin, async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { promptText, notes } = req.body;
+    const adminId = req.user?.id || null;
+
+    if (!promptText || promptText.trim().length === 0) {
+      return res.status(400).json({ error: "Prompt text is required" });
+    }
+
+    // Verify client exists
+    const clientResult = await db.query(
+      "SELECT id, business_name FROM apps WHERE id = $1",
+      [clientId]
+    );
+
+    if (clientResult.rows.length === 0) {
+      return res.status(404).json({ error: "Client not found" });
+    }
+
+    // Get next version number
+    const versionResult = await db.query(
+      "SELECT COALESCE(MAX(version), 0) + 1 as next_version FROM prompts WHERE app_id = $1",
+      [clientId]
+    );
+    const nextVersion = versionResult.rows[0].next_version;
+
+    // Deactivate current active prompt
+    await db.query(
+      "UPDATE prompts SET is_active = false WHERE app_id = $1 AND is_active = true",
+      [clientId]
+    );
+
+    // Create new prompt version (active by default)
+    const insertResult = await db.query(
+      `INSERT INTO prompts (app_id, version, prompt_text, is_active, notes, created_by)
+       VALUES ($1, $2, $3, true, $4, $5)
+       RETURNING id, version, prompt_text, is_active, notes, created_at`,
+      [clientId, nextVersion, promptText.trim(), notes || null, adminId]
+    );
+
+    const newPrompt = insertResult.rows[0];
+
+    console.log(`[Admin] Created prompt v${nextVersion} for client ${clientId}`);
+
+    return res.json({
+      ok: true,
+      message: `Prompt v${nextVersion} created and activated`,
+      data: {
+        id: newPrompt.id,
+        version: newPrompt.version,
+        promptText: newPrompt.prompt_text,
+        isActive: newPrompt.is_active,
+        notes: newPrompt.notes,
+        createdAt: newPrompt.created_at,
+      },
+    });
+  } catch (err) {
+    console.error("Error in POST /api/admin/clients/:clientId/prompt:", err);
+    return res.status(500).json({ error: "Failed to create prompt" });
+  }
+});
+
+// Activate a specific prompt version
+app.put("/api/admin/prompts/:promptId/activate", requireAdmin, async (req, res) => {
+  try {
+    const { promptId } = req.params;
+
+    // Get prompt and its app_id
+    const promptResult = await db.query(
+      "SELECT id, app_id, version FROM prompts WHERE id = $1",
+      [promptId]
+    );
+
+    if (promptResult.rows.length === 0) {
+      return res.status(404).json({ error: "Prompt not found" });
+    }
+
+    const { app_id, version } = promptResult.rows[0];
+
+    // Deactivate current active prompt for this app
+    await db.query(
+      "UPDATE prompts SET is_active = false WHERE app_id = $1 AND is_active = true",
+      [app_id]
+    );
+
+    // Activate the specified prompt
+    await db.query(
+      "UPDATE prompts SET is_active = true WHERE id = $1",
+      [promptId]
+    );
+
+    console.log(`[Admin] Activated prompt v${version} for client ${app_id}`);
+
+    return res.json({
+      ok: true,
+      message: `Prompt v${version} activated`,
+    });
+  } catch (err) {
+    console.error("Error in PUT /api/admin/prompts/:promptId/activate:", err);
+    return res.status(500).json({ error: "Failed to activate prompt" });
+  }
+});
+
+// Get default prompt template (for admin UI)
+app.get("/api/admin/prompt-template", requireAdmin, async (req, res) => {
+  try {
+    return res.json({
+      ok: true,
+      template: PROMPTS_CONFIG.coachSystemPromptTemplate,
+    });
+  } catch (err) {
+    console.error("Error in GET /api/admin/prompt-template:", err);
+    return res.status(500).json({ error: "Failed to get prompt template" });
   }
 });
 

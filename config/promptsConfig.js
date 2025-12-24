@@ -304,7 +304,12 @@ Sound warm and encouraging, and make it clear this is a good place to pause.
 // -----------------------------------------------------------------
 
 function buildCoachBasePrompt(app = {}) {
-  // If coach provided a custom system prompt, use it directly
+  // Priority 1: Active prompt from prompts table (versioned prompts)
+  if (app.active_prompt && app.active_prompt.trim()) {
+    return app.active_prompt;
+  }
+
+  // Priority 2: Legacy custom_system_prompt field on apps table
   if (app.custom_system_prompt && app.custom_system_prompt.trim()) {
     return app.custom_system_prompt;
   }
