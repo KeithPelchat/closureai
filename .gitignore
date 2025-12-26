@@ -31,3 +31,7 @@ coverage/
 
 # Misc
 *.tgz
+
+# Implementation specs and test scripts
+IMPLEMENTATION-SPEC-*.md
+scripts/test-*.sh
