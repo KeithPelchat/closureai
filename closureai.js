@@ -79,11 +79,11 @@ const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || "";
 
 // ---------------------------------------------------------------------
 // CORS (safe for everything, including Stripe)
-// Allow any *.getclosureai.com subdomain for multi-tenant support
+// Allow any *.getclosureai.com subdomain + custom domains for multi-tenant
 // ---------------------------------------------------------------------
 app.use(
   cors({
-    origin: function (origin, callback) {
+    origin: async function (origin, callback) {
       // No origin (same-origin requests, curl, etc.)
       if (!origin) {
         return callback(null, true);
@@ -99,6 +99,19 @@ app.use(
       // Allow localhost for development
       if (origin.match(/^https?:\/\/localhost(:\d+)?$/)) {
         return callback(null, true);
+      }
+      // Check if origin is a valid custom domain in the database
+      try {
+        const hostname = new URL(origin).hostname;
+        const result = await db.query(
+          "SELECT id FROM apps WHERE custom_domain = $1 AND is_active = true",
+          [hostname]
+        );
+        if (result.rows.length > 0) {
+          return callback(null, true);
+        }
+      } catch (err) {
+        console.error("[CORS] Error checking custom domain:", err.message);
       }
       return callback(new Error("Not allowed by CORS: " + origin));
     },
