@@ -465,9 +465,14 @@ async function findOrCreateUser({ email, name, ghlContactId, appId = null, autoG
 
         // Only send if coach has an email configured
         if (coach.coach_email) {
-          const dashboardUrl = coach.base_url
-            ? `${coach.base_url}/my-app`
-            : `https://${coach.subdomain}.getclosureai.com/my-app`;
+          let dashboardUrl;
+          if (coach.base_url) {
+            dashboardUrl = `${coach.base_url}/my-app`;
+          } else if (coach.custom_domain) {
+            dashboardUrl = `https://${coach.custom_domain}/my-app`;
+          } else {
+            dashboardUrl = `https://${coach.subdomain}.getclosureai.com/my-app`;
+          }
 
           await sendLeadNotificationEmail({
             coachEmail: coach.coach_email,
@@ -2182,9 +2187,14 @@ app.post("/auth/register", async (req, res) => {
     // Send lead notification if this is a tenant registration
     if (req.tenant?.id && req.tenant?.coach_email) {
       try {
-        const dashboardUrl = req.tenant.base_url
-          ? `${req.tenant.base_url}/my-app`
-          : `https://${req.tenant.subdomain}.getclosureai.com/my-app`;
+        let dashboardUrl;
+        if (req.tenant.base_url) {
+          dashboardUrl = `${req.tenant.base_url}/my-app`;
+        } else if (req.tenant.custom_domain) {
+          dashboardUrl = `https://${req.tenant.custom_domain}/my-app`;
+        } else {
+          dashboardUrl = `https://${req.tenant.subdomain}.getclosureai.com/my-app`;
+        }
 
         await sendLeadNotificationEmail({
           coachEmail: req.tenant.coach_email,
