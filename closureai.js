@@ -1502,6 +1502,70 @@ app.post("/coach/logout", (req, res) => {
   return res.json({ ok: true, redirectTo: "/coach/login" });
 });
 
+// Coach: View client sessions page
+app.get("/my-app/client/:clientId/sessions", requireCoachAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "coach", "client-sessions.html"));
+});
+
+// Coach API: Get client sessions
+app.get("/api/coach/client/:clientId/sessions", requireCoachAuth, async (req, res) => {
+  try {
+    const coachId = req.coach.id;
+    const { clientId } = req.params;
+
+    // Verify the client belongs to this coach
+    const clientResult = await db.query(
+      "SELECT id, email, name FROM users WHERE id = $1 AND app_id = $2",
+      [clientId, coachId]
+    );
+
+    if (clientResult.rows.length === 0) {
+      return res.status(404).json({ error: "Client not found" });
+    }
+
+    const client = clientResult.rows[0];
+
+    // Get sessions for this client
+    const sessionsResult = await db.query(
+      `SELECT
+        id,
+        thread_id,
+        title,
+        topic,
+        summary,
+        status,
+        created_at,
+        updated_at
+      FROM sessions
+      WHERE user_id = $1 AND app_id = $2
+      ORDER BY created_at DESC`,
+      [clientId, coachId]
+    );
+
+    return res.json({
+      ok: true,
+      client: {
+        id: client.id,
+        email: client.email,
+        name: client.name,
+      },
+      sessions: sessionsResult.rows.map(s => ({
+        id: s.id,
+        threadId: s.thread_id,
+        title: s.title,
+        topic: s.topic,
+        summary: s.summary,
+        status: s.status,
+        createdAt: s.created_at,
+        updatedAt: s.updated_at,
+      })),
+    });
+  } catch (err) {
+    console.error("Error in /api/coach/client/:clientId/sessions:", err);
+    return res.status(500).json({ error: "Failed to fetch sessions" });
+  }
+});
+
 // Coach API: Get dashboard stats
 app.get("/api/coach/stats", requireCoachAuth, async (req, res) => {
   try {
@@ -2505,10 +2569,18 @@ app.post("/auth/reset-password", async (req, res) => {
 
     // Update password and mark email as verified
     const table = user_type === 'client' ? 'apps' : user_type === 'partner' ? 'partners' : 'users'
-    await db.query(
-      `UPDATE ${table} SET password_hash = $1, email_verified = true, updated_at = NOW() WHERE id = $2`,
-      [passwordHash, user_id]
-    )
+    // apps table doesn't have updated_at column
+    if (table === 'apps') {
+      await db.query(
+        `UPDATE ${table} SET password_hash = $1, email_verified = true WHERE id = $2`,
+        [passwordHash, user_id]
+      )
+    } else {
+      await db.query(
+        `UPDATE ${table} SET password_hash = $1, email_verified = true, updated_at = NOW() WHERE id = $2`,
+        [passwordHash, user_id]
+      )
+    }
 
     // Mark token as used
     await db.query(

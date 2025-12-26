@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Client Sessions - ClosureAI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+  <style>
+    /* Coach dashboard overrides - Light theme with green accent */
+    .admin-badge {
+      background: rgba(34, 197, 94, 0.15);
+      color: #16a34a;
+    }
+
+    .admin-sidebar-brand-mark {
+      background: linear-gradient(135deg, #22c55e, #4ade80);
+    }
+
+    .admin-nav-item.active {
+      background: rgba(34, 197, 94, 0.15);
+      color: #16a34a;
+      border-left-color: #22c55e;
+    }
+
+    .client-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .client-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #22c55e, #4ade80);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 18px;
+    }
+
+    .client-info h2 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #0f172a;
+      margin: 0 0 4px 0;
+    }
+
+    .client-info p {
+      font-size: 14px;
+      color: #64748b;
+      margin: 0;
+    }
+
+    .sessions-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .session-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px;
+      transition: all 0.15s;
+    }
+
+    .session-card:hover {
+      border-color: #22c55e;
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.1);
+    }
+
+    .session-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .session-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #0f172a;
+      margin: 0 0 4px 0;
+    }
+
+    .session-date {
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .session-status {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .session-status.completed {
+      background: rgba(34, 197, 94, 0.15);
+      color: #16a34a;
+    }
+
+    .session-status.active {
+      background: rgba(234, 179, 8, 0.15);
+      color: #a16207;
+    }
+
+    .session-summary {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #64748b;
+      text-decoration: none;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    .back-link:hover {
+      color: #22c55e;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: #64748b;
+    }
+
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      opacity: 0.5;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <a href="/my-app" class="admin-sidebar-brand">
+          <div class="admin-sidebar-brand-mark"></div>
+          <div>
+            <div class="admin-sidebar-title">ClosureAI</div>
+            <div class="admin-badge">My App</div>
+          </div>
+        </a>
+      </div>
+
+      <nav class="admin-sidebar-nav">
+        <a href="/my-app" class="admin-nav-item active">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="9"/>
+            <rect x="14" y="3" width="7" height="5"/>
+            <rect x="14" y="12" width="7" height="9"/>
+            <rect x="3" y="16" width="7" height="5"/>
+          </svg>
+          Dashboard
+        </a>
+        <a href="/my-app/settings" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          Settings
+        </a>
+        <a href="/my-app/branding" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="13.5" cy="6.5" r=".5"/>
+            <circle cx="17.5" cy="10.5" r=".5"/>
+            <circle cx="8.5" cy="7.5" r=".5"/>
+            <circle cx="6.5" cy="12.5" r=".5"/>
+            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 6.012 17.461 2 12 2z"/>
+          </svg>
+          Branding
+        </a>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <button type="button" class="admin-back-link" id="logout-btn" style="background:none;border:none;color:inherit;cursor:pointer;width:100%;text-align:left;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-header">
+        <h1 class="admin-header-title">Client Sessions</h1>
+      </header>
+
+      <div class="admin-content">
+        <a href="/my-app" class="back-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Back to Dashboard
+        </a>
+
+        <div class="admin-card">
+          <div class="admin-card-body">
+            <div class="client-header" id="client-header">
+              <div class="client-avatar" id="client-avatar">?</div>
+              <div class="client-info">
+                <h2 id="client-name">Loading...</h2>
+                <p id="client-email">-</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-card" style="margin-top: 24px;">
+          <div class="admin-card-header">
+            <h2 class="admin-card-title">Sessions</h2>
+          </div>
+          <div class="admin-card-body" id="sessions-container">
+            <div style="text-align: center; padding: 24px; color: #64748b;">
+              Loading...
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      return new Date(dateStr).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+    }
+
+    function getInitials(name, email) {
+      if (name) {
+        return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      }
+      return email ? email[0].toUpperCase() : '?';
+    }
+
+    // Get client ID from URL
+    const pathParts = window.location.pathname.split('/');
+    const clientId = pathParts[pathParts.indexOf('client') + 1];
+
+    async function loadSessions() {
+      const container = document.getElementById('sessions-container');
+
+      try {
+        const res = await fetch(`/api/coach/client/${clientId}/sessions`);
+        const data = await res.json();
+
+        if (!data.ok) {
+          container.innerHTML = '<p style="color: #ef4444;">Failed to load sessions</p>';
+          return;
+        }
+
+        // Update client info
+        const client = data.client;
+        document.getElementById('client-name').textContent = client.name || client.email;
+        document.getElementById('client-email').textContent = client.email;
+        document.getElementById('client-avatar').textContent = getInitials(client.name, client.email);
+
+        // Update sessions
+        if (!data.sessions.length) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              <p>This client hasn't had any sessions yet.</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="sessions-list">
+            ${data.sessions.map(s => `
+              <div class="session-card">
+                <div class="session-header">
+                  <div>
+                    <h3 class="session-title">${escapeHtml(s.topic || s.title || 'Coaching Session')}</h3>
+                    <div class="session-date">${formatDate(s.createdAt)}</div>
+                  </div>
+                  <span class="session-status ${s.status || 'active'}">${s.status || 'Active'}</span>
+                </div>
+                ${s.summary ? `<p class="session-summary">${escapeHtml(s.summary)}</p>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } catch (err) {
+        console.error('Failed to load sessions:', err);
+        container.innerHTML = '<p style="color: #ef4444;">Failed to load sessions</p>';
+      }
+    }
+
+    // Logout
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      try {
+        const res = await fetch('/coach/logout', { method: 'POST' });
+        const data = await res.json();
+        if (data.redirectTo) {
+          window.location.href = data.redirectTo;
+        }
+      } catch (err) {
+        console.error('Logout error:', err);
+      }
+    });
+
+    // Initialize
+    loadSessions();
+  </script>
+</body>
+</html>
