@@ -73,7 +73,7 @@
   padding: 12px 20px;
   color: #94a3b8;
   text-decoration: none;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   transition: all 0.15s ease;
 }
@@ -140,7 +140,7 @@
 }
 
 .admin-header-title {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 600;
   color: #1e293b;
   margin: 0;
@@ -182,15 +182,16 @@
 }
 
 .stat-card-label {
-  font-size: 13px;
+  font-size: 14px;
   color: #64748b;
   margin-bottom: 8px;
+  font-weight: 500;
 }
 
 .stat-card-value {
-  font-size: 28px;
+  font-size: 36px;
   font-weight: 700;
-  color: #1e293b;
+  color: #0f172a;
   line-height: 1.2;
 }
 
@@ -225,9 +226,9 @@
 }
 
 .admin-card-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
-  color: #1e293b;
+  color: #0f172a;
   margin: 0;
 }
 
@@ -250,8 +251,8 @@
 
 .admin-table th {
   text-align: left;
-  padding: 12px 16px;
-  font-size: 12px;
+  padding: 14px 16px;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -262,8 +263,8 @@
 
 .admin-table td {
   padding: 14px 16px;
-  font-size: 14px;
-  color: #334155;
+  font-size: 15px;
+  color: #1e293b;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
 }
@@ -281,10 +282,10 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .status-badge::before {
@@ -327,10 +328,10 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 18px;
+  padding: 12px 20px;
   border-radius: 10px;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
   border: none;
   transition: all 0.15s ease;
@@ -381,18 +382,18 @@
 
 .admin-form-label {
   display: block;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
   color: #475569;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .admin-form-input {
   width: 100%;
-  padding: 10px 14px;
+  padding: 12px 14px;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 15px;
   color: #1e293b;
   background: #ffffff;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -520,9 +521,9 @@
 }
 
 .admin-modal-title {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
-  color: #1e293b;
+  color: #0f172a;
   margin: 0;
 }
 
@@ -575,10 +576,10 @@
 
 .admin-search-input {
   width: 100%;
-  padding: 10px 14px 10px 42px;
+  padding: 12px 14px 12px 42px;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 15px;
   background: #ffffff;
 }
 
@@ -683,14 +684,14 @@
 }
 
 .admin-empty-state-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: #475569;
   margin-bottom: 8px;
 }
 
 .admin-empty-state-text {
-  font-size: 14px;
+  font-size: 15px;
   max-width: 320px;
   margin: 0 auto;
 }
@@ -726,7 +727,7 @@
 }
 
 .session-preview-message {
-  font-size: 13px;
+  font-size: 15px;
   color: #475569;
   line-height: 1.6;
 }

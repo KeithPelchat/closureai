@@ -2003,7 +2003,7 @@ app.post("/api/coach/offers", requireCoachAuth, async (req, res) => {
     );
 
     const result = await db.query(
-      `INSERT INTO offers (app_id, title, description, cta_text, cta_url, is_active, show_as_card, display_order)
+      `INSERT INTO offers (app_id, title, description, cta_text, url, is_active, show_as_card, display_order)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [req.coach.id, title, description, ctaText, ctaUrl, isActive !== false, showAsCard !== false, orderResult.rows[0].next_order]
@@ -2026,7 +2026,7 @@ app.put("/api/coach/offers/:id", requireCoachAuth, async (req, res) => {
         title = COALESCE($1, title),
         description = COALESCE($2, description),
         cta_text = COALESCE($3, cta_text),
-        cta_url = COALESCE($4, cta_url),
+        url = COALESCE($4, url),
         is_active = COALESCE($5, is_active),
         show_as_card = COALESCE($6, show_as_card)
       WHERE id = $7 AND app_id = $8
