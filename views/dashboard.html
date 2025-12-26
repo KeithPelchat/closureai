@@ -180,14 +180,48 @@
 
       /* --------- Mobile polish --------- */
 
-      @media (max-width: 640px) {
+      @media (max-width: 768px) {
         .app-main-inner {
           padding: 16px 10px 32px;
         }
 
-        /* Stack header pills if needed */
+        /* Stack header vertically on mobile */
         .app-header-inner {
-          padding-inline: 10px;
+          flex-direction: column !important;
+          align-items: flex-start !important;
+          justify-content: flex-start !important;
+          gap: 10px !important;
+          padding: 12px 12px !important;
+        }
+
+        .brand {
+          width: 100%;
+        }
+
+        .app-header-right {
+          width: 100%;
+          justify-content: flex-start !important;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        #header-user {
+          font-size: 12px;
+          flex: 0 1 auto;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        #logout-btn {
+          font-size: 12px !important;
+          padding: 6px 12px !important;
+        }
+
+        #admin-link {
+          font-size: 12px !important;
+          padding: 6px 12px !important;
         }
 
         /* Welcome card stacks text + CTA */
