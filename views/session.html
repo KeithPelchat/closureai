@@ -450,10 +450,11 @@
                   <div class="composer-footer">
                     <div>
                       <div class="tip-text">
-                        Tip: It doesn’t have to be perfect. A few honest
-                        sentences are enough. You can end the session any time
-                        by saying
-                        <strong>“I’m good for now, thank you.”</strong>
+                        Tip: It doesn't have to be perfect. A few honest
+                        sentences are enough.
+                      </div>
+                      <div class="turn-indicator" id="turn-indicator" style="display:none; font-size: 13px; color: #6b7280; margin-top: 4px;">
+                        Turn <span id="current-turn">0</span> of <span id="max-turns">6</span>
                       </div>
                       <div
                         id="error-text"
@@ -461,18 +462,28 @@
                         style="display:none;"
                       ></div>
                     </div>
-                    <button
-                      type="submit"
-                      class="btn-primary"
-                      id="submit-btn"
-                    >
-                      <span id="submit-label">Get clarity on this</span>
-                      <span
-                        id="submit-spinner"
-                        class="spinner"
-                        style="display:none;"
-                      ></span>
-                    </button>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                      <button
+                        type="button"
+                        class="btn btn-ghost"
+                        id="end-session-btn"
+                        style="display: none; font-size: 14px; padding: 10px 18px; border-radius: 999px;"
+                      >
+                        I'm Done
+                      </button>
+                      <button
+                        type="submit"
+                        class="btn-primary"
+                        id="submit-btn"
+                      >
+                        <span id="submit-label">Get clarity on this</span>
+                        <span
+                          id="submit-spinner"
+                          class="spinner"
+                          style="display:none;"
+                        ></span>
+                      </button>
+                    </div>
                   </div>
 
                   <p class="session-disclaimer">
@@ -549,10 +560,18 @@
       const submitBtn = document.getElementById("submit-btn");
       const submitLabel = document.getElementById("submit-label");
       const submitSpinner = document.getElementById("submit-spinner");
+      const endSessionBtn = document.getElementById("end-session-btn");
+      const turnIndicator = document.getElementById("turn-indicator");
+      const currentTurnEl = document.getElementById("current-turn");
+      const maxTurnsEl = document.getElementById("max-turns");
 
       // messages: [{ role: 'user'|'assistant', content: string }]
       let messages = [];
       let currentThreadId = null;
+      let currentSessionId = null;
+      let sessionEnded = false;
+      let currentTurn = 0;
+      let maxTurns = 6;
 
       function setSubmitting(isSubmitting) {
         if (!submitBtn || !submitLabel || !submitSpinner) return;
@@ -648,9 +667,96 @@
         }
       }
 
+      // ---------- Update turn indicator ----------
+      function updateTurnIndicator() {
+        if (currentTurn > 0) {
+          turnIndicator.style.display = "block";
+          currentTurnEl.textContent = currentTurn;
+          maxTurnsEl.textContent = maxTurns;
+          endSessionBtn.style.display = "inline-block";
+        }
+      }
+
+      // ---------- Show session summary ----------
+      function showSessionSummary(summary, offer) {
+        sessionEnded = true;
+        submitBtn.style.display = "none";
+        endSessionBtn.style.display = "none";
+        textareaEl.disabled = true;
+        textareaEl.placeholder = "This session has ended.";
+
+        // Add summary message to chat
+        if (summary) {
+          const summaryRow = document.createElement("div");
+          summaryRow.className = "chat-row chat-row-assistant";
+          summaryRow.innerHTML = `
+            <div class="chat-label">Session Summary</div>
+            <div class="chat-bubble" style="background: #f0fdf4; border-color: #bbf7d0;">
+              ${summary}
+            </div>
+          `;
+          chatLogEl.appendChild(summaryRow);
+        }
+
+        // Add offer card if available
+        if (offer && offer.title) {
+          const offerCard = document.createElement("div");
+          offerCard.style.cssText = "margin: 20px 0; padding: 20px; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);";
+          offerCard.innerHTML = `
+            <div style="font-size: 18px; font-weight: 600; color: #0f172a; margin-bottom: 8px;">${offer.title}</div>
+            ${offer.description ? `<p style="font-size: 14px; color: #475569; margin: 0 0 16px; line-height: 1.5;">${offer.description}</p>` : ''}
+            <a href="${offer.url || '#'}" target="_blank" class="btn btn-primary" style="font-size: 14px; display: inline-block;">${offer.cta_text || 'Learn More'}</a>
+          `;
+          chatLogEl.appendChild(offerCard);
+        }
+
+        // Add "session ended" notice
+        const endNotice = document.createElement("div");
+        endNotice.style.cssText = "text-align: center; padding: 20px; color: #6b7280; font-size: 14px;";
+        endNotice.innerHTML = `
+          <p style="margin: 0 0 12px;">This session has ended.</p>
+          <a href="/session" class="btn btn-primary" style="font-size: 14px;">Start a new session</a>
+          <a href="/dashboard" class="btn btn-ghost" style="margin-left: 10px; font-size: 14px;">Back to dashboard</a>
+        `;
+        chatLogEl.appendChild(endNotice);
+
+        // Scroll to bottom
+        chatLogEl.parentElement.scrollTop = chatLogEl.parentElement.scrollHeight;
+      }
+
+      // ---------- End session early ----------
+      async function endSessionEarly() {
+        if (!currentSessionId && !currentThreadId) return;
+
+        try {
+          endSessionBtn.disabled = true;
+          endSessionBtn.textContent = "Ending...";
+
+          const data = await fetchJSON("/api/ai/end-session", {
+            method: "POST",
+            body: JSON.stringify({
+              sessionId: currentSessionId,
+              threadId: currentThreadId,
+            }),
+          });
+
+          showSessionSummary(data.summary, data.offer);
+        } catch (err) {
+          console.error("Error ending session:", err);
+          errorEl.textContent = "Failed to end session. Please try again.";
+          errorEl.style.display = "block";
+          endSessionBtn.disabled = false;
+          endSessionBtn.textContent = "I'm Done";
+        }
+      }
+
+      endSessionBtn.addEventListener("click", endSessionEarly);
+
       // ---------- Form submit handler ----------
       formEl.addEventListener("submit", async (e) => {
         e.preventDefault();
+
+        if (sessionEnded) return;
 
         const narrative = (textareaEl.value || "").trim();
         errorEl.style.display = "none";
@@ -685,24 +791,21 @@
           });
 
           currentThreadId = data.threadId || currentThreadId;
+          currentSessionId = data.sessionId || currentSessionId;
 
+          // Update turn tracking
+          if (data.turnNumber) currentTurn = data.turnNumber;
+          if (data.maxTurns) maxTurns = data.maxTurns;
+          updateTurnIndicator();
+
+          // Get reply from new or legacy format
           let reply = "";
-          if (
-            typeof data.cleanedOutput === "string" &&
-            data.cleanedOutput.trim()
-          ) {
+          if (typeof data.response === "string" && data.response.trim()) {
+            reply = data.response.trim();
+          } else if (typeof data.cleanedOutput === "string" && data.cleanedOutput.trim()) {
             reply = data.cleanedOutput.trim();
-          } else if (
-            typeof data.rawOutput === "string" &&
-            data.rawOutput.trim()
-          ) {
+          } else if (typeof data.rawOutput === "string" && data.rawOutput.trim()) {
             reply = data.rawOutput.trim();
-          } else if (
-            typeof data.message === "string" &&
-            data.message.trim()
-          ) {
-            // Legacy fallback
-            reply = data.message.trim();
           }
 
           if (!reply) {
@@ -716,10 +819,15 @@
           if (data.isWrapUp && data.offers && data.offers.length > 0) {
             renderOfferCards(data.offers, chatLogEl);
           }
+
+          // Handle session completion
+          if (data.sessionCompleted) {
+            showSessionSummary(null);
+          }
         } catch (err) {
           console.error("Error getting clarity:", err);
           errorEl.textContent =
-            "We couldn’t get a response just now. Please try again in a moment.";
+            "We couldn't get a response just now. Please try again in a moment.";
           errorEl.style.display = "block";
         } finally {
           setSubmitting(false);

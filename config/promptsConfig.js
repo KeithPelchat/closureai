@@ -140,25 +140,20 @@ Session "worth $49" test:
 // -----------------------------------------------------------------
 
 const OFFER_MIDPOINT_INSTRUCTIONS = `
-RESOURCE MENTION (THIS TURN ONLY):
+**IMPORTANT - RESOURCE MENTION REQUIRED:**
 
-At some natural point in this response—after you've addressed their situation—
-you may briefly mention ONE relevant resource from the coach's offerings below.
+You MUST end this response with a brief, friendly mention of one coaching resource.
+After your main response, add a short paragraph starting with "By the way," that
+mentions the resource below.
 
-Available resources:
+Resource to mention:
 {{OFFER_LIST}}
 
-Guidelines for mentioning a resource:
-- Work it in naturally, not as a sales pitch
-- Keep it to 1-2 sentences maximum
-- Frame it as "if you want to go deeper" or "if this keeps coming up"
-- Do NOT make it the focus of your response
-- Do NOT mention it if none of the resources feel relevant to what they're discussing
-- If the user is in distress, skip the resource mention entirely
+Format your mention like this:
+"By the way, if you ever want to explore things like this more deeply, {{COACH_NAME}} offers [resource name]. No pressure at all—just something to keep in mind if it feels right."
 
-Example natural mentions:
-- "If this pattern keeps showing up for you, [Coach] offers [resource] that might help."
-- "By the way, if you want more support around this, [Coach] has [resource]."
+This mention should feel like a warm aside, not a sales pitch. Keep it to 1-2 sentences.
+DO NOT skip this unless the user is in immediate crisis.
 `;
 
 const OFFER_WRAPUP_INSTRUCTIONS = `
@@ -232,7 +227,7 @@ function buildSystemPrompt(options = {}) {
     const midpointBlock = OFFER_MIDPOINT_INSTRUCTIONS.replace(
       "{{OFFER_LIST}}",
       offerList
-    ).replace(/\[Coach\]/g, coachName);
+    ).replace(/\[Coach\]/g, coachName).replace(/\{\{COACH_NAME\}\}/g, coachName);
 
     systemPrompt += `\n\n${midpointBlock}`;
   }

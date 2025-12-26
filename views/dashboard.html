@@ -461,27 +461,74 @@
             const textWrap = document.createElement("div");
             textWrap.style.flex = "1";
 
+            // Header with title and status badge
+            const header = document.createElement("div");
+            header.style.cssText = "display: flex; align-items: center; gap: 8px; margin-bottom: 4px;";
+
             const title = document.createElement("div");
             title.className = "session-title";
-            title.textContent = session.title || "Clarity session";
+            title.textContent = session.topic || session.title || "Clarity session";
+            title.style.cssText = "font-weight: 500; color: #0f172a;";
+
+            const statusBadge = document.createElement("span");
+            statusBadge.style.cssText = "font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 500;";
+            if (session.status === "completed") {
+              statusBadge.textContent = "Completed";
+              statusBadge.style.background = "#dcfce7";
+              statusBadge.style.color = "#166534";
+            } else if (session.status === "active") {
+              statusBadge.textContent = "In Progress";
+              statusBadge.style.background = "#fef3c7";
+              statusBadge.style.color = "#92400e";
+            } else {
+              statusBadge.textContent = session.status || "";
+              statusBadge.style.background = "#f1f5f9";
+              statusBadge.style.color = "#475569";
+            }
+
+            header.appendChild(title);
+            if (session.status) header.appendChild(statusBadge);
+
+            // Summary or turn count
+            const summary = document.createElement("div");
+            summary.style.cssText = "font-size: 13px; color: #64748b; line-height: 1.4; margin-bottom: 4px;";
+            if (session.summary) {
+              summary.textContent = session.summary;
+            } else if (session.turnCount) {
+              summary.textContent = `${session.turnCount} turn${session.turnCount !== 1 ? 's' : ''} in this session`;
+            }
 
             const meta = document.createElement("div");
             meta.className = "session-meta";
-            meta.textContent = session.lastUpdatedAt
+            meta.style.cssText = "font-size: 12px; color: #94a3b8;";
+            meta.textContent = session.createdAt
+              ? formatDateTime(session.createdAt)
+              : session.lastUpdatedAt
               ? formatDateTime(session.lastUpdatedAt)
               : "";
 
-            textWrap.appendChild(title);
+            textWrap.appendChild(header);
+            if (summary.textContent) textWrap.appendChild(summary);
             textWrap.appendChild(meta);
 
             const actions = document.createElement("div");
             actions.className = "session-actions";
-            const openLink = document.createElement("a");
-            openLink.href =
-              "/session?threadId=" + encodeURIComponent(session.threadId);
-            openLink.className = "btn btn-ghost btn-sm";
-            openLink.textContent = "Open";
-            actions.appendChild(openLink);
+
+            if (session.status === "active") {
+              const continueLink = document.createElement("a");
+              continueLink.href = "/session?threadId=" + encodeURIComponent(session.threadId);
+              continueLink.className = "btn btn-primary btn-sm";
+              continueLink.style.cssText = "font-size: 13px; padding: 6px 14px;";
+              continueLink.textContent = "Continue";
+              actions.appendChild(continueLink);
+            } else {
+              const viewLink = document.createElement("a");
+              viewLink.href = "/session?threadId=" + encodeURIComponent(session.threadId);
+              viewLink.className = "btn btn-ghost btn-sm";
+              viewLink.style.cssText = "font-size: 13px; padding: 6px 14px;";
+              viewLink.textContent = "View";
+              actions.appendChild(viewLink);
+            }
 
             li.appendChild(textWrap);
             li.appendChild(actions);
@@ -490,7 +537,7 @@
         } catch (err) {
           console.error("Error loading sessions:", err);
           errorEl.textContent =
-            "We couldn’t load your recent sessions just now. Please try again in a moment.";
+            "We couldn't load your recent sessions just now. Please try again in a moment.";
           errorEl.style.display = "block";
           emptyEl.style.display = "none";
         }
