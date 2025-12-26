@@ -16,7 +16,7 @@ const STRIPE_CONFIG = require("./config/stripeConfig");
 const UI_CONFIG = require("./config/uiConfig");
 
 const db = require("./db");
-const { sendMagicLinkEmail, sendVerificationEmail, sendPasswordResetEmail } = require("./email/sesEmail");
+const { sendMagicLinkEmail, sendVerificationEmail, sendPasswordResetEmail, sendLeadNotificationEmail } = require("./email/sesEmail");
 const bcrypt = require("bcryptjs");
 
 const stripe = require("stripe")(STRIPE_CONFIG.secretKey || "");
@@ -65,14 +65,6 @@ initAppId().catch((err) => {
 // Static assets (logo, favicons, OG images, etc.)
 // ---------------------------------------------------------------------
 app.use("/assets", express.static(path.join(__dirname, "assets")));
-
-// ---------------------------------------------------------------------
-// Root route → templated default.html (PWA entry shell)
-// ---------------------------------------------------------------------
-app.get("/", (req, res) => {
-  const filePath = path.join(__dirname, "public", "default.html");
-  renderHtmlTemplate(res, filePath, {}, req.tenant);
-});
 
 // ---------------------------------------------------------------------
 // Config
@@ -306,6 +298,22 @@ async function resolveTenant(req, res, next) {
 app.use(resolveTenant);
 
 // ---------------------------------------------------------------------
+// Root route → templated default.html (PWA entry shell) or tenant landing page
+// Must be after tenant resolution middleware
+// ---------------------------------------------------------------------
+app.get("/", (req, res) => {
+  // If this is a tenant subdomain AND user is not authenticated, show landing page
+  if (req.tenant && !req.cookies.closureai_auth) {
+    const filePath = path.join(__dirname, "views", "tenant-landing.html");
+    return renderHtmlTemplate(res, filePath, {}, req.tenant);
+  }
+
+  // Otherwise show the app shell (existing behavior)
+  const filePath = path.join(__dirname, "public", "default.html");
+  renderHtmlTemplate(res, filePath, {}, req.tenant);
+});
+
+// ---------------------------------------------------------------------
 // Dynamic PWA manifest (per-tenant branding)
 // Must be before static middleware to take precedence
 // ---------------------------------------------------------------------
@@ -389,7 +397,7 @@ function hasActiveHolidayPass(user) {
 // DB helpers
 // ---------------------------------------------------------------------
 
-async function findOrCreateUser({ email, name, ghlContactId, appId = null, autoGrantDays = null }) {
+async function findOrCreateUser({ email, name, ghlContactId, appId = null, autoGrantDays = null, sendLeadNotification = false }) {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail) {
     throw new Error("Email is required to findOrCreateUser");
@@ -440,6 +448,43 @@ async function findOrCreateUser({ email, name, ghlContactId, appId = null, autoG
 
   if (accessExpiry) {
     console.log(`[User] Auto-granted ${autoGrantDays} days access to ${normalizedEmail}`);
+  }
+
+  // Send lead notification to coach if this is a NEW user on a tenant app
+  if (sendLeadNotification && effectiveAppId) {
+    try {
+      // Get coach info for this app
+      const coachResult = await db.query(
+        `SELECT coach_email, coach_name, business_name, subdomain, custom_domain, base_url
+         FROM apps WHERE id = $1`,
+        [effectiveAppId]
+      );
+
+      if (coachResult.rows.length > 0) {
+        const coach = coachResult.rows[0];
+
+        // Only send if coach has an email configured
+        if (coach.coach_email) {
+          const dashboardUrl = coach.base_url
+            ? `${coach.base_url}/my-app`
+            : `https://${coach.subdomain}.getclosureai.com/my-app`;
+
+          await sendLeadNotificationEmail({
+            coachEmail: coach.coach_email,
+            coachName: coach.coach_name || "Coach",
+            userName: name,
+            userEmail: normalizedEmail,
+            businessName: coach.business_name || "Your Coaching App",
+            dashboardUrl,
+          });
+
+          console.log(`[Lead] Notification sent to ${coach.coach_email} for new user ${normalizedEmail}`);
+        }
+      }
+    } catch (emailErr) {
+      // Don't fail user creation if email fails
+      console.error("[Lead] Failed to send notification email:", emailErr.message);
+    }
   }
 
   return result.rows[0];
@@ -613,11 +658,11 @@ async function getAppProfile(appId) {
 
     // Fetch active prompt from prompts table (takes precedence over custom_system_prompt)
     const promptResult = await db.query(
-      `SELECT content FROM prompts WHERE app_id = $1 AND is_active = true LIMIT 1`,
+      `SELECT prompt_text FROM prompts WHERE app_id = $1 AND is_active = true LIMIT 1`,
       [appId]
     );
     if (promptResult.rows.length > 0) {
-      app.active_prompt = promptResult.rows[0].content;
+      app.active_prompt = promptResult.rows[0].prompt_text;
     }
 
     return app;
@@ -686,6 +731,12 @@ function getTemplateTokens(tenant = null, extraTokens = {}) {
     defaults.LOGIN_HEADLINE = `Welcome to ${tenant.business_name || "your coaching space"}`;
     defaults.LOGIN_SUBHEADLINE = `Sign in to start your session with ${tenant.coach_name || "your coach"}`;
     defaults.SESSION_INTRO = `I'm here to help you work through whatever's on your mind. What would you like to explore today?`;
+
+    // Landing page specific tokens
+    defaults.COACHING_NICHE = tenant.coaching_niche || "";
+    defaults.COACH_BIO = tenant.coach_bio || "";
+    // Hide about section if no coach bio
+    defaults.COACH_BIO_CLASS = tenant.coach_bio ? "" : "hidden";
   }
 
   return {
@@ -723,30 +774,32 @@ async function requireAuth(req, res, next) {
   const token = req.cookies.closureai_auth;
 
   if (!token) {
+    console.log(`[Auth] No token found for ${req.path}`);
     return respondUnauthorized(req, res);
   }
 
   try {
     const payload = jwt.verify(token, JWT_SECRET);
 
-    const result = await db.query("SELECT * FROM users WHERE id = $1", [
+    // Scope user lookup by app_id to ensure multi-tenant isolation
+    const appId = req.tenant?.id || APP_ID;
+    const result = await db.query("SELECT * FROM users WHERE id = $1 AND app_id = $2", [
       payload.userId,
+      appId,
     ]);
 
     if (result.rows.length === 0) {
+      // User not found for this tenant - clear stale cookie and redirect to login
+      console.log(`[Auth] User ${payload.userId} not found for tenant ${appId} on ${req.path}`);
+      res.clearCookie('closureai_auth');
       return respondUnauthorized(req, res);
     }
 
     const user = result.rows[0];
-    const passActive = hasActiveHolidayPass(user);
 
     req.user = user;
-    req.holidayPassActive = passActive;
-    req.holidayPassExpiresAt = user.holiday_pass_expires_at;
-
-    if (!passActive) {
-      return respondHolidayPassExpired(req, res);
-    }
+    req.holidayPassActive = true; // Holiday pass promo ended - everyone has access
+    req.holidayPassExpiresAt = null;
 
     return next();
   } catch (err) {
@@ -1979,6 +2032,9 @@ app.get("/login", (req, res) => {
 // Simple auth status for the default.html shell
 app.get("/auth/status", async (req, res) => {
   const token = req.cookies.closureai_auth;
+  const appId = req.tenant?.id || APP_ID;
+
+  console.log(`[AuthStatus] Checking auth for tenant ${appId}, has token: ${!!token}`);
 
   if (!token) {
     return res.json({ authenticated: false });
@@ -1987,24 +2043,28 @@ app.get("/auth/status", async (req, res) => {
   try {
     const payload = jwt.verify(token, JWT_SECRET);
 
+    // Scope by app_id for multi-tenant isolation
     const result = await db.query(
-      "SELECT id, holiday_pass_expires_at FROM users WHERE id = $1",
-      [payload.userId]
+      "SELECT id, email, holiday_pass_expires_at FROM users WHERE id = $1 AND app_id = $2",
+      [payload.userId, appId]
     );
 
     if (result.rows.length === 0) {
+      console.log(`[AuthStatus] User ${payload.userId} not found for tenant ${appId}`);
       return res.json({ authenticated: false });
     }
 
     const user = result.rows[0];
-    const holidayPassActive = hasActiveHolidayPass(user);
+
+    console.log(`[AuthStatus] User ${user.email} authenticated`);
 
     return res.json({
       authenticated: true,
-      holidayPassActive,
-      holidayPassExpiresAt: user.holiday_pass_expires_at,
+      holidayPassActive: true, // Holiday pass promo ended - everyone has access
+      holidayPassExpiresAt: null,
     });
   } catch (err) {
+    console.log(`[AuthStatus] JWT verify error: ${err.message}`);
     return res.json({ authenticated: false });
   }
 });
@@ -2024,6 +2084,7 @@ app.post("/auth/secure-link", async (req, res) => {
       ghlContactId: null,
       appId: req.tenant?.id,
       autoGrantDays: req.tenant?.auto_grant_access_days,
+      sendLeadNotification: true,
     });
 
     const loginUrl = await createMagicLink(user.id);
@@ -2098,14 +2159,47 @@ app.post("/auth/register", async (req, res) => {
       return res.json({ ok: true, message: 'Password set. You can now sign in.' })
     }
 
-    // Create new user
+    // Create new user with auto-granted access days if configured
     const passwordHash = await hashPassword(password)
+    const autoGrantDays = req.tenant?.auto_grant_access_days
+    let accessExpiry = null
+    if (autoGrantDays && autoGrantDays > 0) {
+      accessExpiry = new Date()
+      accessExpiry.setDate(accessExpiry.getDate() + autoGrantDays)
+    }
+
     const result = await db.query(
-      `INSERT INTO users (email, name, password_hash, app_id, email_verified, status)
-       VALUES ($1, $2, $3, $4, false, 'active')
+      `INSERT INTO users (email, name, password_hash, app_id, email_verified, status, holiday_pass_expires_at)
+       VALUES ($1, $2, $3, $4, false, 'active', $5)
        RETURNING id`,
-      [normalizedEmail, name || null, passwordHash, appId]
+      [normalizedEmail, name || null, passwordHash, appId, accessExpiry]
     )
+
+    if (accessExpiry) {
+      console.log(`[Register] Auto-granted ${autoGrantDays} days access to ${normalizedEmail}`)
+    }
+
+    // Send lead notification if this is a tenant registration
+    if (req.tenant?.id && req.tenant?.coach_email) {
+      try {
+        const dashboardUrl = req.tenant.base_url
+          ? `${req.tenant.base_url}/my-app`
+          : `https://${req.tenant.subdomain}.getclosureai.com/my-app`;
+
+        await sendLeadNotificationEmail({
+          coachEmail: req.tenant.coach_email,
+          coachName: req.tenant.coach_name || "Coach",
+          userName: name,
+          userEmail: normalizedEmail,
+          businessName: req.tenant.business_name || "Your Coaching App",
+          dashboardUrl,
+        });
+
+        console.log(`[Lead] Notification sent to ${req.tenant.coach_email} for new user ${normalizedEmail}`);
+      } catch (emailErr) {
+        console.error("[Lead] Failed to send notification email:", emailErr.message);
+      }
+    }
 
     const verifyToken = await createEmailVerificationToken('user', result.rows[0].id)
     const baseUrl = getBaseUrl(req)
@@ -2176,14 +2270,17 @@ app.post("/auth/login", async (req, res) => {
       maxAge: 30 * 24 * 60 * 60 * 1000
     }
 
-    if (hostname.endsWith('.getclosureai.com')) {
+    // Set cookie domain for getclosureai.com and all subdomains
+    if (hostname === 'getclosureai.com' || hostname.endsWith('.getclosureai.com')) {
       cookieOptions.domain = '.getclosureai.com'
     }
 
+    console.log(`[Login] User ${normalizedEmail} logged in on ${hostname}, cookie domain: ${cookieOptions.domain || '(none)'}`)
+
     res.cookie('closureai_auth', jwtToken, cookieOptions)
 
-    // Redirect admins to platform dashboard
-    const redirectTo = user.is_admin ? '/platform' : '/'
+    // Redirect admins to platform dashboard, regular users to dashboard
+    const redirectTo = user.is_admin ? '/platform' : '/dashboard'
 
     return res.json({ ok: true, user: { id: user.id, name: user.name, isAdmin: user.is_admin || false }, redirectTo })
   } catch (err) {
@@ -2402,9 +2499,23 @@ app.post("/auth/reset-password", async (req, res) => {
 
 // Logout: clear cookie
 app.post("/auth/logout", (req, res) => {
+  const hostname = req.hostname || req.get("host")?.split(":")[0] || "";
+
+  // Clear cookies with domain to handle cross-subdomain auth
+  const clearOptions = {};
+  if (hostname === "getclosureai.com" || hostname.endsWith(".getclosureai.com")) {
+    clearOptions.domain = ".getclosureai.com";
+  }
+
+  res.clearCookie("closureai_auth", clearOptions);
+  res.clearCookie("closureai_client_auth", clearOptions);
+  res.clearCookie("closureai_partner_auth", clearOptions);
+
+  // Also clear without domain in case cookie was set without it
   res.clearCookie("closureai_auth");
   res.clearCookie("closureai_client_auth");
   res.clearCookie("closureai_partner_auth");
+
   return res.json({ ok: true });
 });
 
@@ -2884,6 +2995,7 @@ app.get("/auth/google/callback", async (req, res) => {
       ghlContactId: null,
       appId: req.tenant?.id,
       autoGrantDays: req.tenant?.auto_grant_access_days,
+      sendLeadNotification: true,
     });
 
     const jwtToken = jwt.sign({ userId: user.id }, JWT_SECRET, {
@@ -2950,6 +3062,7 @@ app.post("/ghl/new-user", async (req, res) => {
       ghlContactId: contactId || null,
       appId: req.tenant?.id,
       autoGrantDays: req.tenant?.auto_grant_access_days,
+      sendLeadNotification: true,
     });
 
     const loginUrl = await createMagicLink(user.id);
@@ -3324,11 +3437,11 @@ app.post("/api/ai/closure", requireAuth, async (req, res) => {
     // Fetch active prompt from prompts table (if not already loaded via getAppProfile)
     if (appProfile && !appProfile.active_prompt) {
       const promptResult = await db.query(
-        `SELECT content FROM prompts WHERE app_id = $1 AND is_active = true LIMIT 1`,
+        `SELECT prompt_text FROM prompts WHERE app_id = $1 AND is_active = true LIMIT 1`,
         [effectiveAppId]
       );
       if (promptResult.rows.length > 0) {
-        appProfile = { ...appProfile, active_prompt: promptResult.rows[0].content };
+        appProfile = { ...appProfile, active_prompt: promptResult.rows[0].prompt_text };
       }
     }
 
@@ -3343,61 +3456,97 @@ app.post("/api/ai/closure", requireAuth, async (req, res) => {
       appProfile
     );
 
-    // If no threadId was provided, this is a brand-new thread
-    const effectiveThreadId = threadId || uuidv4();
-
     // Use the explicit narrative if provided, otherwise last user message
-    const inputPrompt =
+    const userMessage =
       typeof narrative === "string" && narrative.trim()
         ? narrative.trim()
         : conversationMessages[conversationMessages.length - 1].content;
 
-    const rawOutput = assistantReply;
-    const cleanedOutput = assistantReply;
-    const parsed = null;
+    const maxTurns = PROMPTS_CONFIG.maxAssistantTurns || 6;
+    const turnNumber = assistantTurns + 1; // This is the turn we're creating
+    const isWrapUpTurn = turnNumber >= maxTurns;
 
     // -----------------------------
-    // Persist session row
+    // Get or create session
     // -----------------------------
-    const sessionId = uuidv4();
-    const turnIndex = assistantTurns;
+    let sessionId;
+    let isNewSession = false;
 
+    if (threadId) {
+      // Check if session exists for this thread
+      const existingSession = await db.query(
+        `SELECT id, status FROM sessions WHERE thread_id = $1 AND user_id = $2 AND app_id = $3`,
+        [threadId, req.user.id, effectiveAppId]
+      );
+
+      if (existingSession.rows.length > 0) {
+        sessionId = existingSession.rows[0].id;
+        // Check if session is still active
+        if (existingSession.rows[0].status !== 'active') {
+          return res.status(400).json({ error: "This session has ended. Please start a new conversation." });
+        }
+      }
+    }
+
+    if (!sessionId) {
+      // Create new session
+      sessionId = uuidv4();
+      isNewSession = true;
+      const newThreadId = threadId || uuidv4();
+
+      await db.query(
+        `INSERT INTO sessions (id, user_id, app_id, thread_id, input_prompt, status, turn_count)
+         VALUES ($1, $2, $3, $4, $5, 'active', 0)`,
+        [sessionId, req.user.id, effectiveAppId, newThreadId, userMessage]
+      );
+    }
+
+    // -----------------------------
+    // Store interaction
+    // -----------------------------
     await db.query(
-      `
-      INSERT INTO sessions (
-        id,
-        user_id,
-        app_id,
-        thread_id,
-        turn_index,
-        input_prompt,
-        raw_output,
-        cleaned_output
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      `,
-      [
-        sessionId,
-        req.user.id,
-        effectiveAppId,
-        effectiveThreadId,
-        turnIndex,
-        inputPrompt,
-        rawOutput,
-        cleanedOutput,
-      ]
+      `INSERT INTO interactions (session_id, turn_number, user_message, ai_response)
+       VALUES ($1, $2, $3, $4)`,
+      [sessionId, turnNumber, userMessage, assistantReply]
     );
 
+    // Update session turn count
+    await db.query(
+      `UPDATE sessions SET turn_count = $1, raw_output = $2 WHERE id = $3`,
+      [turnNumber, assistantReply, sessionId]
+    );
+
+    // Get the thread_id for response
+    const sessionData = await db.query(`SELECT thread_id FROM sessions WHERE id = $1`, [sessionId]);
+    const effectiveThreadId = sessionData.rows[0]?.thread_id;
+
     // -----------------------------
-    // Determine if we should return offers for UI card
+    // Handle session completion
     // -----------------------------
-    const maxTurns = PROMPTS_CONFIG.maxAssistantTurns || 6;
-    const isWrapUpTurn = assistantTurns >= maxTurns - 1;
+    if (isWrapUpTurn) {
+      await db.query(
+        `UPDATE sessions SET status = 'completed', closed_at = NOW() WHERE id = $1`,
+        [sessionId]
+      );
+    }
 
     // Get offers that should show as cards
     const cardOffers = isWrapUpTurn
       ? offers.filter((o) => o.show_as_card && o.is_active)
       : [];
+
+    // -----------------------------
+    // Append soft CTA at midpoint turn
+    // -----------------------------
+    let finalResponse = assistantReply;
+    const midpointTurn = Math.ceil(maxTurns / 2); // Turn 3 for maxTurns=6
+    const inlineOffers = offers.filter((o) => o.show_inline && o.is_active);
+
+    if (turnNumber === midpointTurn && inlineOffers.length > 0) {
+      const offer = inlineOffers[0];
+      const ctaText = `\n\nBy the way, if you ever want to explore things like this more deeply, ${coachName} offers a ${offer.title}${offer.description ? ` — ${offer.description.toLowerCase()}` : ''}. No pressure at all—just something to keep in mind if it feels right.`;
+      finalResponse = assistantReply + ctaText;
+    }
 
     // -----------------------------
     // Response
@@ -3406,11 +3555,11 @@ app.post("/api/ai/closure", requireAuth, async (req, res) => {
       success: true,
       sessionId,
       threadId: effectiveThreadId,
-      rawOutput,
-      cleanedOutput,
-      parsed,
-      turnIndex: assistantTurns + 1,
+      response: finalResponse,
+      turnNumber,
+      maxTurns,
       isWrapUp: isWrapUpTurn,
+      sessionCompleted: isWrapUpTurn,
       offers: cardOffers.map((o) => ({
         id: o.id,
         title: o.title,
@@ -3428,6 +3577,209 @@ app.post("/api/ai/closure", requireAuth, async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------
+// End session early ("I'm Done") with summary generation
+// ---------------------------------------------------------------------
+app.post("/api/ai/end-session", requireAuth, async (req, res) => {
+  try {
+    const { sessionId, threadId } = req.body || {};
+
+    if (!sessionId && !threadId) {
+      return res.status(400).json({ error: "sessionId or threadId is required" });
+    }
+
+    const effectiveAppId = req.tenant?.id || APP_ID;
+
+    // Find the session
+    let session;
+    if (sessionId) {
+      const result = await db.query(
+        `SELECT id, status, thread_id FROM sessions WHERE id = $1 AND user_id = $2 AND app_id = $3`,
+        [sessionId, req.user.id, effectiveAppId]
+      );
+      session = result.rows[0];
+    } else {
+      const result = await db.query(
+        `SELECT id, status, thread_id FROM sessions WHERE thread_id = $1 AND user_id = $2 AND app_id = $3`,
+        [threadId, req.user.id, effectiveAppId]
+      );
+      session = result.rows[0];
+    }
+
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    if (session.status !== 'active') {
+      return res.status(400).json({ error: "Session is already closed" });
+    }
+
+    // Get all interactions for this session
+    const interactionsResult = await db.query(
+      `SELECT user_message, ai_response FROM interactions WHERE session_id = $1 ORDER BY turn_number`,
+      [session.id]
+    );
+
+    // Generate summary using AI
+    let summary = null;
+    if (interactionsResult.rows.length > 0) {
+      const conversationText = interactionsResult.rows
+        .map((i) => `User: ${i.user_message}\nAI: ${i.ai_response}`)
+        .join("\n\n");
+
+      try {
+        const summaryCompletion = await openai.chat.completions.create({
+          model: PROMPTS_CONFIG.model || "gpt-4.1-mini",
+          messages: [
+            {
+              role: "system",
+              content: `You are a helpful assistant. Generate a brief 2-3 sentence summary of this coaching conversation. Focus on the main topic discussed and any key insights or action items the user identified. Be warm and encouraging.`,
+            },
+            {
+              role: "user",
+              content: conversationText,
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 200,
+        });
+
+        summary = summaryCompletion.choices?.[0]?.message?.content?.trim() || null;
+      } catch (err) {
+        console.error("Error generating summary:", err);
+        // Continue without summary if generation fails
+      }
+    }
+
+    // Update session to completed
+    await db.query(
+      `UPDATE sessions SET status = 'completed', closed_at = NOW(), summary = $1 WHERE id = $2`,
+      [summary, session.id]
+    );
+
+    // Fetch offers to show at wrapup
+    const offersResult = await db.query(
+      `SELECT id, title, description, url, cta_text
+       FROM offers
+       WHERE app_id = $1 AND is_active = true AND show_at_wrapup = true
+       ORDER BY display_order
+       LIMIT 1`,
+      [effectiveAppId]
+    );
+    const offer = offersResult.rows[0] || null;
+
+    return res.json({
+      success: true,
+      sessionId: session.id,
+      summary,
+      offer,
+      message: "Session ended successfully",
+    });
+  } catch (err) {
+    console.error("Error in /api/ai/end-session:", err);
+    return res.status(500).json({ error: "Failed to end session" });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Get session history for a user
+// ---------------------------------------------------------------------
+app.get("/api/sessions", requireAuth, async (req, res) => {
+  try {
+    const effectiveAppId = req.tenant?.id || APP_ID;
+    const { status, limit = 20, offset = 0 } = req.query;
+
+    let query = `
+      SELECT s.id, s.thread_id, s.input_prompt, s.status, s.turn_count, s.summary,
+             s.created_at, s.closed_at,
+             (SELECT COUNT(*) FROM interactions WHERE session_id = s.id) as interaction_count
+      FROM sessions s
+      WHERE s.user_id = $1 AND s.app_id = $2
+    `;
+    const params = [req.user.id, effectiveAppId];
+
+    if (status) {
+      query += ` AND s.status = $3`;
+      params.push(status);
+    }
+
+    query += ` ORDER BY s.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(parseInt(limit, 10), parseInt(offset, 10));
+
+    const result = await db.query(query, params);
+
+    return res.json({
+      success: true,
+      sessions: result.rows.map((s) => ({
+        id: s.id,
+        threadId: s.thread_id,
+        topic: s.input_prompt?.substring(0, 100) + (s.input_prompt?.length > 100 ? "..." : ""),
+        status: s.status,
+        turnCount: s.turn_count || s.interaction_count,
+        summary: s.summary,
+        createdAt: s.created_at,
+        closedAt: s.closed_at,
+      })),
+    });
+  } catch (err) {
+    console.error("Error in GET /api/sessions:", err);
+    return res.status(500).json({ error: "Failed to fetch sessions" });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Get single session with all interactions
+// ---------------------------------------------------------------------
+app.get("/api/sessions/:sessionId", requireAuth, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const effectiveAppId = req.tenant?.id || APP_ID;
+
+    // Get session
+    const sessionResult = await db.query(
+      `SELECT id, thread_id, input_prompt, status, turn_count, summary, created_at, closed_at
+       FROM sessions WHERE id = $1 AND user_id = $2 AND app_id = $3`,
+      [sessionId, req.user.id, effectiveAppId]
+    );
+
+    if (sessionResult.rows.length === 0) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    const session = sessionResult.rows[0];
+
+    // Get all interactions
+    const interactionsResult = await db.query(
+      `SELECT id, turn_number, user_message, ai_response, created_at
+       FROM interactions WHERE session_id = $1 ORDER BY turn_number`,
+      [sessionId]
+    );
+
+    return res.json({
+      success: true,
+      session: {
+        id: session.id,
+        threadId: session.thread_id,
+        topic: session.input_prompt,
+        status: session.status,
+        turnCount: session.turn_count,
+        summary: session.summary,
+        createdAt: session.created_at,
+        closedAt: session.closed_at,
+        interactions: interactionsResult.rows.map((i) => ({
+          id: i.id,
+          turnNumber: i.turn_number,
+          userMessage: i.user_message,
+          aiResponse: i.ai_response,
+          createdAt: i.created_at,
+        })),
+      },
+    });
+  } catch (err) {
+    console.error("Error in GET /api/sessions/:sessionId:", err);
+    return res.status(500).json({ error: "Failed to fetch session" });
+  }
+});
 
 // ---- SES test route ----
 app.get("/test/email", async (req, res) => {

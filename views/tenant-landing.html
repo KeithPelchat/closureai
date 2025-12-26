@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{BUSINESS_NAME}} - Free Coaching Session</title>
+  <link rel="icon" href="{{APP_LOGO}}">
+  <style>
+    :root {
+      --primary: {{PRIMARY_COLOR}};
+      --secondary: {{SECONDARY_COLOR}};
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.6;
+      color: #1f2937;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Header */
+    header {
+      padding: 24px 0;
+      text-align: center;
+    }
+
+    .logo {
+      height: 48px;
+      width: auto;
+    }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 64px 0;
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 16px;
+    }
+
+    .hero p {
+      font-size: 1.25rem;
+      color: #4b5563;
+      margin-bottom: 32px;
+    }
+
+    .cta-button {
+      display: inline-block;
+      background: var(--primary);
+      color: white;
+      padding: 16px 32px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1.125rem;
+      transition: background 0.2s;
+    }
+
+    .cta-button:hover {
+      background: var(--secondary);
+    }
+
+    /* Benefits */
+    .benefits {
+      padding: 64px 0;
+      background: #f9fafb;
+    }
+
+    .benefits-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 32px;
+      text-align: center;
+    }
+
+    .benefit {
+      padding: 24px;
+    }
+
+    .benefit-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      color: white;
+      font-size: 24px;
+    }
+
+    .benefit h3 {
+      font-size: 1.125rem;
+      margin-bottom: 8px;
+    }
+
+    .benefit p {
+      color: #6b7280;
+      font-size: 0.95rem;
+    }
+
+    /* About */
+    .about {
+      padding: 64px 0;
+      text-align: center;
+    }
+
+    .about h2 {
+      font-size: 1.75rem;
+      margin-bottom: 24px;
+    }
+
+    .about-bio {
+      max-width: 600px;
+      margin: 0 auto 32px;
+      color: #4b5563;
+    }
+
+    .about.hidden {
+      display: none;
+    }
+
+    /* Footer */
+    footer {
+      padding: 32px 0;
+      text-align: center;
+      border-top: 1px solid #e5e7eb;
+      color: #6b7280;
+      font-size: 0.875rem;
+    }
+
+    footer a {
+      color: #6b7280;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      color: var(--primary);
+    }
+
+    .powered-by {
+      margin-top: 16px;
+      font-size: 0.75rem;
+    }
+
+    /* Mobile */
+    @media (max-width: 640px) {
+      .hero h1 {
+        font-size: 1.875rem;
+      }
+
+      .hero p {
+        font-size: 1rem;
+      }
+
+      .hero, .benefits, .about {
+        padding: 48px 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <img src="{{APP_LOGO}}" alt="{{BUSINESS_NAME}}" class="logo">
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <h1>Get Clarity on What's Weighing on You</h1>
+      <p>A free AI-guided coaching session with {{COACH_NAME}}'s approach</p>
+      <a href="/login" class="cta-button">Start Your Free Session</a>
+    </div>
+  </section>
+
+  <section class="benefits">
+    <div class="container">
+      <div class="benefits-grid">
+        <div class="benefit">
+          <div class="benefit-icon">&#10003;</div>
+          <h3>Get Clear</h3>
+          <p>Understand what's really going on beneath the surface</p>
+        </div>
+        <div class="benefit">
+          <div class="benefit-icon">&#10003;</div>
+          <h3>No Judgment</h3>
+          <p>A safe space to explore your thoughts and feelings</p>
+        </div>
+        <div class="benefit">
+          <div class="benefit-icon">&#10003;</div>
+          <h3>Take Action</h3>
+          <p>Walk away with a concrete next step you can take today</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="about {{COACH_BIO_CLASS}}" id="about-section">
+    <div class="container">
+      <h2>About {{COACH_NAME}}</h2>
+      <p class="about-bio">{{COACH_BIO}}</p>
+      <a href="/login" class="cta-button">Start Your Free Session</a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>&copy; {{BUSINESS_NAME}} &middot; <a href="/privacy">Privacy</a> &middot; <a href="/terms">Terms</a></p>
+      <p class="powered-by">Powered by <a href="https://getclosureai.com">ClosureAI</a></p>
+    </div>
+  </footer>
+</body>
+</html>

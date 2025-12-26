@@ -528,8 +528,204 @@ async function sendPasswordResetEmail({ to, name, resetUrl }) {
   await sesClient.send(command);
 }
 
+/**
+ * HTML template for lead notification email to coach.
+ */
+function buildLeadNotificationHtml({ coachName, userName, userEmail, businessName, dashboardUrl }) {
+  const safeCoachName = coachName || "Coach";
+  const safeUserName = userName || "Not provided";
+  const safeBusinessName = businessName || "Your Coaching App";
+  const signedUpDate = new Date().toLocaleString();
+
+  return `
+  <!doctype html>
+  <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>New Lead for ${safeBusinessName}</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <style>
+        body {
+          margin: 0;
+          padding: 0;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          background: #f9fafb;
+          color: #1f2937;
+        }
+        .wrapper {
+          width: 100%;
+          padding: 32px 0;
+        }
+        .card {
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 28px 24px;
+          border-radius: 16px;
+          background: #ffffff;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+          border: 1px solid #e5e7eb;
+        }
+        h2 {
+          font-size: 22px;
+          margin: 0 0 16px;
+          color: #0d9488;
+        }
+        p {
+          font-size: 14px;
+          line-height: 1.6;
+          margin: 0 0 12px;
+        }
+        .info-box {
+          background: #f3f4f6;
+          padding: 16px;
+          border-radius: 8px;
+          margin: 24px 0;
+        }
+        .info-box p {
+          margin: 0 0 8px;
+        }
+        .info-box p:last-child {
+          margin: 0;
+        }
+        .btn {
+          display: inline-block;
+          margin-top: 16px;
+          padding: 12px 24px;
+          border-radius: 6px;
+          background: #0d9488;
+          color: #ffffff !important;
+          font-weight: 600;
+          font-size: 14px;
+          text-decoration: none;
+        }
+        .footer {
+          font-size: 12px;
+          color: #6b7280;
+          margin-top: 32px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="wrapper">
+        <div class="card">
+          <h2>New Lead for ${safeBusinessName}</h2>
+          <p>Hey ${safeCoachName},</p>
+          <p>Someone just signed up for your AI coaching tool!</p>
+          <div class="info-box">
+            <p><strong>Name:</strong> ${safeUserName}</p>
+            <p><strong>Email:</strong> ${userEmail}</p>
+            <p><strong>Signed up:</strong> ${signedUpDate}</p>
+          </div>
+          <p>
+            <a href="${dashboardUrl}" class="btn" target="_blank" rel="noopener noreferrer">
+              View Your Dashboard
+            </a>
+          </p>
+          <p class="footer">
+            &mdash; ClosureAI
+          </p>
+        </div>
+      </div>
+    </body>
+  </html>
+  `;
+}
+
+/**
+ * Plain-text fallback for lead notification email.
+ */
+function buildLeadNotificationText({ coachName, userName, userEmail, businessName, dashboardUrl }) {
+  const safeCoachName = coachName || "Coach";
+  const safeUserName = userName || "Not provided";
+  const safeBusinessName = businessName || "Your Coaching App";
+  const signedUpDate = new Date().toLocaleString();
+
+  return [
+    `New Lead for ${safeBusinessName}`,
+    "",
+    `Hey ${safeCoachName},`,
+    "",
+    "Someone just signed up for your AI coaching tool!",
+    "",
+    `Name: ${safeUserName}`,
+    `Email: ${userEmail}`,
+    `Signed up: ${signedUpDate}`,
+    "",
+    `View your dashboard: ${dashboardUrl}`,
+    "",
+    "— ClosureAI",
+  ].join("\n");
+}
+
+/**
+ * Send lead notification email to coach when new user signs up.
+ */
+async function sendLeadNotificationEmail({
+  coachEmail,
+  coachName,
+  userName,
+  userEmail,
+  businessName,
+  dashboardUrl,
+}) {
+  if (!coachEmail) {
+    throw new Error("sendLeadNotificationEmail: 'coachEmail' is required");
+  }
+  if (!userEmail) {
+    throw new Error("sendLeadNotificationEmail: 'userEmail' is required");
+  }
+
+  const from = buildFrom();
+  const subject = `New lead: ${userName || userEmail}`;
+
+  const htmlBody = buildLeadNotificationHtml({
+    coachName,
+    userName,
+    userEmail,
+    businessName,
+    dashboardUrl,
+  });
+  const textBody = buildLeadNotificationText({
+    coachName,
+    userName,
+    userEmail,
+    businessName,
+    dashboardUrl,
+  });
+
+  const params = {
+    Source: from,
+    Destination: {
+      ToAddresses: [coachEmail],
+    },
+    ReplyToAddresses: EMAIL_CONFIG.replyToEmail
+      ? [EMAIL_CONFIG.replyToEmail]
+      : [],
+    Message: {
+      Subject: {
+        Data: subject,
+        Charset: "UTF-8",
+      },
+      Body: {
+        Html: {
+          Data: htmlBody,
+          Charset: "UTF-8",
+        },
+        Text: {
+          Data: textBody,
+          Charset: "UTF-8",
+        },
+      },
+    },
+  };
+
+  const command = new SendEmailCommand(params);
+  await sesClient.send(command);
+}
+
 module.exports = {
   sendMagicLinkEmail,
   sendVerificationEmail,
   sendPasswordResetEmail,
+  sendLeadNotificationEmail,
 };
