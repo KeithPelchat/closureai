@@ -158,41 +158,6 @@
       color: #4ade80;
     }
 
-    .stripe-info {
-      background: rgba(14, 165, 233, 0.1);
-      border: 1px solid rgba(14, 165, 233, 0.3);
-      border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 20px;
-      font-size: 13px;
-      color: #94a3b8;
-    }
-
-    .stripe-info a {
-      color: #38bdf8;
-    }
-
-    .stripe-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-
-    .stripe-status-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-    }
-
-    .stripe-status-dot.connected {
-      background: #22c55e;
-    }
-
-    .stripe-status-dot.not-connected {
-      background: #ef4444;
-    }
-
     .interaction-limit-input {
       display: flex;
       align-items: center;
@@ -404,23 +369,12 @@
       </header>
 
       <div class="admin-content">
-        <!-- Client Access Settings -->
+        <!-- Session Settings -->
         <div class="admin-card settings-section">
           <div class="admin-card-header">
-            <h2 class="admin-card-title">Client Access</h2>
+            <h2 class="admin-card-title">Session Settings</h2>
           </div>
           <div class="admin-card-body">
-            <div class="form-group">
-              <div class="toggle-container">
-                <label class="toggle-switch">
-                  <input type="checkbox" id="charge-users" />
-                  <span class="toggle-slider"></span>
-                </label>
-                <span class="toggle-label">Charge users for access</span>
-              </div>
-              <p class="form-hint">When enabled, users need a paid subscription or manual access grant to use your app.</p>
-            </div>
-
             <div class="form-group">
               <label class="form-label">Interaction Limit (per session)</label>
               <div class="interaction-limit-input">
@@ -428,37 +382,6 @@
                 <span>AI turns per conversation</span>
               </div>
               <p class="form-hint">How many AI responses before the session wraps up. Default is 6.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Stripe Settings -->
-        <div class="admin-card settings-section">
-          <div class="admin-card-header">
-            <h2 class="admin-card-title">Stripe Integration</h2>
-          </div>
-          <div class="admin-card-body">
-            <div class="stripe-info">
-              To charge your clients, connect your own Stripe account.
-              <a href="https://dashboard.stripe.com/apikeys" target="_blank">Get your API keys from Stripe Dashboard</a>.
-              Payments go directly to your account.
-            </div>
-
-            <div class="stripe-status">
-              <div class="stripe-status-dot" id="stripe-status-dot"></div>
-              <span id="stripe-status-text">Checking...</span>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Publishable Key</label>
-              <input type="text" class="form-input" id="stripe-pk" placeholder="pk_live_..." autocomplete="off" />
-              <p class="form-hint">Your Stripe publishable key (starts with pk_)</p>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Secret Key</label>
-              <input type="password" class="form-input" id="stripe-sk" placeholder="sk_live_..." autocomplete="off" />
-              <p class="form-hint">Your Stripe secret key (starts with sk_) - stored securely</p>
             </div>
           </div>
         </div>
@@ -547,21 +470,7 @@
         if (data.ok && data.data) {
           profile = data.data;
 
-          document.getElementById('charge-users').checked = profile.chargeUsers;
           document.getElementById('interaction-limit').value = profile.interactionLimit || 6;
-
-          // Stripe status
-          const dotEl = document.getElementById('stripe-status-dot');
-          const textEl = document.getElementById('stripe-status-text');
-          if (profile.hasStripeKeys) {
-            dotEl.classList.add('connected');
-            dotEl.classList.remove('not-connected');
-            textEl.textContent = 'Stripe connected';
-          } else {
-            dotEl.classList.add('not-connected');
-            dotEl.classList.remove('connected');
-            textEl.textContent = 'Stripe not connected';
-          }
 
           offers = profile.offers || [];
           renderOffers();
@@ -618,19 +527,11 @@
       msgEl.textContent = '';
 
       try {
-        const chargeUsers = document.getElementById('charge-users').checked;
         const interactionLimit = document.getElementById('interaction-limit').value;
-        const stripeSecretKey = document.getElementById('stripe-sk').value.trim();
-        const stripePublishableKey = document.getElementById('stripe-pk').value.trim();
 
         const body = {
-          chargeUsers,
           interactionLimit: parseInt(interactionLimit, 10),
         };
-
-        // Only include Stripe keys if they were entered
-        if (stripeSecretKey) body.stripeSecretKey = stripeSecretKey;
-        if (stripePublishableKey) body.stripePublishableKey = stripePublishableKey;
 
         const res = await fetch('/api/coach/settings', {
           method: 'PUT',
@@ -643,9 +544,6 @@
         if (data.ok) {
           msgEl.textContent = 'Settings saved!';
           msgEl.style.color = '#4ade80';
-          // Clear Stripe key inputs after save
-          document.getElementById('stripe-sk').value = '';
-          document.getElementById('stripe-pk').value = '';
           loadProfile();
         } else {
           msgEl.textContent = data.error || 'Failed to save.';

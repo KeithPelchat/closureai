@@ -145,6 +145,74 @@
       opacity: 0.5;
       margin-bottom: 16px;
     }
+
+    .session-card {
+      cursor: pointer;
+    }
+
+    .session-card.expanded {
+      border-color: #22c55e;
+    }
+
+    .session-turns {
+      margin-top: 16px;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 16px;
+      display: none;
+    }
+
+    .session-card.expanded .session-turns {
+      display: block;
+    }
+
+    .turn {
+      margin-bottom: 16px;
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .turn-user {
+      background: #f1f5f9;
+    }
+
+    .turn-ai {
+      background: #f0fdf4;
+      border-left: 3px solid #22c55e;
+    }
+
+    .turn-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+
+    .turn-content {
+      font-size: 14px;
+      color: #0f172a;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .turn-time {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 6px;
+    }
+
+    .expand-hint {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 8px;
+    }
+
+    .loading-turns {
+      text-align: center;
+      padding: 16px;
+      color: #64748b;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -304,15 +372,17 @@
         container.innerHTML = `
           <div class="sessions-list">
             ${data.sessions.map(s => `
-              <div class="session-card">
+              <div class="session-card" data-session-id="${s.id}" onclick="toggleSession(this, '${s.id}')">
                 <div class="session-header">
                   <div>
                     <h3 class="session-title">${escapeHtml(s.topic || s.title || 'Coaching Session')}</h3>
-                    <div class="session-date">${formatDate(s.createdAt)}</div>
+                    <div class="session-date">${formatDate(s.createdAt)} · ${s.turnCount || 0} turns</div>
                   </div>
                   <span class="session-status ${s.status || 'active'}">${s.status || 'Active'}</span>
                 </div>
                 ${s.summary ? `<p class="session-summary">${escapeHtml(s.summary)}</p>` : ''}
+                <div class="expand-hint">Click to view full conversation</div>
+                <div class="session-turns" id="turns-${s.id}"></div>
               </div>
             `).join('')}
           </div>
@@ -335,6 +405,70 @@
         console.error('Logout error:', err);
       }
     });
+
+    // Toggle session to show/hide full conversation
+    async function toggleSession(card, sessionId) {
+      const turnsContainer = document.getElementById(`turns-${sessionId}`);
+
+      // If already expanded, collapse it
+      if (card.classList.contains('expanded')) {
+        card.classList.remove('expanded');
+        return;
+      }
+
+      // Collapse any other expanded cards
+      document.querySelectorAll('.session-card.expanded').forEach(c => {
+        c.classList.remove('expanded');
+      });
+
+      // Expand this card
+      card.classList.add('expanded');
+
+      // If already loaded, just show it
+      if (turnsContainer.dataset.loaded === 'true') {
+        return;
+      }
+
+      // Show loading state
+      turnsContainer.innerHTML = '<div class="loading-turns">Loading conversation...</div>';
+
+      try {
+        const res = await fetch(`/api/coach/session/${sessionId}`);
+        const data = await res.json();
+
+        if (!data.ok || !data.session) {
+          turnsContainer.innerHTML = '<p style="color: #ef4444;">Failed to load conversation</p>';
+          return;
+        }
+
+        const turns = data.session.turns || [];
+
+        if (turns.length === 0) {
+          turnsContainer.innerHTML = '<p style="color: #64748b;">No conversation turns found.</p>';
+          turnsContainer.dataset.loaded = 'true';
+          return;
+        }
+
+        turnsContainer.innerHTML = turns.map((t, idx) => `
+          <div class="turn turn-user">
+            <div class="turn-label">Client (Turn ${t.turnNumber || idx + 1})</div>
+            <div class="turn-content">${escapeHtml(t.userMessage)}</div>
+            <div class="turn-time">${formatDate(t.createdAt)}</div>
+          </div>
+          ${t.aiResponse ? `
+          <div class="turn turn-ai">
+            <div class="turn-label">AI Coach</div>
+            <div class="turn-content">${escapeHtml(t.aiResponse)}</div>
+          </div>
+          ` : ''}
+        `).join('');
+
+        turnsContainer.dataset.loaded = 'true';
+      } catch (err) {
+        console.error('Failed to load session details:', err);
+        turnsContainer.innerHTML = '<p style="color: #ef4444;">Failed to load conversation</p>';
+      }
+    }
 
     // Initialize
     loadSessions();

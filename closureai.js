@@ -1530,12 +1530,12 @@ app.get("/api/coach/client/:clientId/sessions", requireCoachAuth, async (req, re
       `SELECT
         id,
         thread_id,
-        title,
-        topic,
+        input_prompt,
         summary,
         status,
+        turn_count,
         created_at,
-        updated_at
+        closed_at
       FROM sessions
       WHERE user_id = $1 AND app_id = $2
       ORDER BY created_at DESC`,
@@ -1552,17 +1552,80 @@ app.get("/api/coach/client/:clientId/sessions", requireCoachAuth, async (req, re
       sessions: sessionsResult.rows.map(s => ({
         id: s.id,
         threadId: s.thread_id,
-        title: s.title,
-        topic: s.topic,
+        title: s.input_prompt ? s.input_prompt.substring(0, 100) : 'Coaching Session',
+        topic: null,
         summary: s.summary,
-        status: s.status,
+        status: s.status || (s.closed_at ? 'completed' : 'active'),
+        turnCount: s.turn_count,
         createdAt: s.created_at,
-        updatedAt: s.updated_at,
+        closedAt: s.closed_at,
       })),
     });
   } catch (err) {
     console.error("Error in /api/coach/client/:clientId/sessions:", err);
     return res.status(500).json({ error: "Failed to fetch sessions" });
+  }
+});
+
+// Coach API: Get full session details (all turns in conversation)
+app.get("/api/coach/session/:sessionId", requireCoachAuth, async (req, res) => {
+  try {
+    const coachId = req.coach.id;
+    const { sessionId } = req.params;
+
+    // Get the session and verify it belongs to this coach's client
+    const sessionResult = await db.query(
+      `SELECT s.id, s.thread_id, s.user_id, s.input_prompt, s.status, s.turn_count, s.summary, s.created_at, s.closed_at,
+              u.email as client_email, u.name as client_name
+       FROM sessions s
+       JOIN users u ON s.user_id = u.id
+       WHERE s.id = $1 AND s.app_id = $2`,
+      [sessionId, coachId]
+    );
+
+    if (sessionResult.rows.length === 0) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    const session = sessionResult.rows[0];
+
+    // Get all turns from the interactions table
+    const turnsResult = await db.query(
+      `SELECT id, turn_number, user_message, ai_response, created_at
+       FROM interactions
+       WHERE session_id = $1
+       ORDER BY turn_number ASC`,
+      [sessionId]
+    );
+
+    return res.json({
+      ok: true,
+      session: {
+        id: session.id,
+        threadId: session.thread_id || session.id,
+        topic: session.input_prompt,
+        status: session.status || (session.closed_at ? 'completed' : 'active'),
+        turnCount: session.turn_count || turnsResult.rows.length,
+        summary: session.summary,
+        createdAt: session.created_at,
+        closedAt: session.closed_at,
+        client: {
+          id: session.user_id,
+          email: session.client_email,
+          name: session.client_name,
+        },
+        turns: turnsResult.rows.map((t) => ({
+          id: t.id,
+          turnNumber: t.turn_number,
+          userMessage: t.user_message,
+          aiResponse: t.ai_response,
+          createdAt: t.created_at,
+        })),
+      },
+    });
+  } catch (err) {
+    console.error("Error in /api/coach/session/:sessionId:", err);
+    return res.status(500).json({ error: "Failed to fetch session details" });
   }
 });
 
@@ -1648,9 +1711,7 @@ app.get("/api/coach/profile", requireCoachAuth, async (req, res) => {
         secondaryColor: coach.secondary_color,
         backgroundColor: coach.background_color,
         status: coach.status,
-        chargeUsers: coach.charge_users,
         interactionLimit: coach.interaction_limit,
-        hasStripeKeys: !!(coach.coach_stripe_secret_key && coach.coach_stripe_publishable_key),
         offers: offersResult.rows.map(o => ({
           id: o.id,
           title: o.title,
@@ -1679,7 +1740,7 @@ app.get("/api/coach/clients", requireCoachAuth, async (req, res) => {
         u.email,
         u.name,
         u.created_at,
-        u.holiday_pass_expires_at,
+        u.status,
         (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.app_id = $1) as session_count,
         (SELECT MAX(created_at) FROM sessions s WHERE s.user_id = u.id AND s.app_id = $1) as last_session
       FROM users u
@@ -1695,7 +1756,7 @@ app.get("/api/coach/clients", requireCoachAuth, async (req, res) => {
         email: r.email,
         name: r.name,
         createdAt: r.created_at,
-        accessExpiresAt: r.holiday_pass_expires_at,
+        status: r.status || 'active',
         sessionCount: parseInt(r.session_count, 10),
         lastSession: r.last_session,
       })),
@@ -1717,8 +1778,7 @@ app.get("/api/coach/clients/export", requireCoachAuth, async (req, res) => {
         u.email,
         u.name,
         u.created_at,
-        u.holiday_pass_expires_at,
-        CASE WHEN u.holiday_pass_expires_at > NOW() THEN 'active' ELSE 'expired' END as status,
+        u.status,
         (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.app_id = $1) as session_count,
         (SELECT MAX(created_at) FROM sessions s WHERE s.user_id = u.id AND s.app_id = $1) as last_session
       FROM users u
@@ -1834,47 +1894,19 @@ app.put("/api/coach/branding", requireCoachAuth, async (req, res) => {
   }
 });
 
-// Coach API: Update settings (Stripe keys, charge users, interaction limit)
+// Coach API: Update settings (interaction limit)
 app.put("/api/coach/settings", requireCoachAuth, async (req, res) => {
   try {
     const coachId = req.coach.id;
-    const { stripeSecretKey, stripePublishableKey, chargeUsers, interactionLimit } = req.body || {};
+    const { interactionLimit } = req.body || {};
 
-    const updates = [];
-    const values = [coachId];
-    let paramIndex = 1;
-
-    if (stripeSecretKey !== undefined) {
-      paramIndex++;
-      updates.push(`coach_stripe_secret_key = $${paramIndex}`);
-      values.push(stripeSecretKey || null);
-    }
-
-    if (stripePublishableKey !== undefined) {
-      paramIndex++;
-      updates.push(`coach_stripe_publishable_key = $${paramIndex}`);
-      values.push(stripePublishableKey || null);
-    }
-
-    if (chargeUsers !== undefined) {
-      paramIndex++;
-      updates.push(`charge_users = $${paramIndex}`);
-      values.push(!!chargeUsers);
-    }
-
-    if (interactionLimit !== undefined) {
-      paramIndex++;
-      updates.push(`interaction_limit = $${paramIndex}`);
-      values.push(parseInt(interactionLimit, 10) || 6);
-    }
-
-    if (updates.length === 0) {
+    if (interactionLimit === undefined) {
       return res.status(400).json({ error: "No updates provided" });
     }
 
     await db.query(
-      `UPDATE apps SET ${updates.join(", ")} WHERE id = $1`,
-      values
+      `UPDATE apps SET interaction_limit = $2 WHERE id = $1`,
+      [coachId, parseInt(interactionLimit, 10) || 6]
     );
 
     return res.json({ ok: true, message: "Settings updated" });
@@ -2033,17 +2065,14 @@ app.delete("/api/coach/offers/:id", requireCoachAuth, async (req, res) => {
   }
 });
 
-// Grant client access (for coaches who charge users)
-app.post("/api/coach/grant-access", requireCoachAuth, async (req, res) => {
+// Add client (for coaches)
+app.post("/api/coach/add-client", requireCoachAuth, async (req, res) => {
   try {
-    const { email, name, days } = req.body || {};
+    const { email, name } = req.body || {};
 
     if (!email) {
       return res.status(400).json({ error: "Email is required" });
     }
-
-    const accessDays = parseInt(days, 10) || 30;
-    const expiresAt = new Date(Date.now() + accessDays * 24 * 60 * 60 * 1000);
 
     // Find or create user
     const normalizedEmail = email.toLowerCase().trim();
@@ -2053,21 +2082,23 @@ app.post("/api/coach/grant-access", requireCoachAuth, async (req, res) => {
     );
 
     if (userResult.rows.length === 0) {
-      // Create new user
+      // Create new user with active status
       userResult = await db.query(
-        `INSERT INTO users (email, name, app_id, holiday_pass_expires_at)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO users (email, name, app_id, status)
+         VALUES ($1, $2, $3, 'active')
          RETURNING *`,
-        [normalizedEmail, name || null, req.coach.id, expiresAt]
+        [normalizedEmail, name || null, req.coach.id]
       );
     } else {
-      // Update existing user's access
-      userResult = await db.query(
-        `UPDATE users SET holiday_pass_expires_at = $1
-         WHERE id = $2
-         RETURNING *`,
-        [expiresAt, userResult.rows[0].id]
-      );
+      // User already exists
+      return res.json({
+        ok: true,
+        message: "Client already exists",
+        user: {
+          id: userResult.rows[0].id,
+          email: userResult.rows[0].email,
+        },
+      });
     }
 
     return res.json({
@@ -2075,12 +2106,43 @@ app.post("/api/coach/grant-access", requireCoachAuth, async (req, res) => {
       user: {
         id: userResult.rows[0].id,
         email: userResult.rows[0].email,
-        accessExpiresAt: expiresAt,
       },
     });
   } catch (err) {
-    console.error("Error in POST /api/coach/grant-access:", err);
-    return res.status(500).json({ error: "Failed to grant access" });
+    console.error("Error in POST /api/coach/add-client:", err);
+    return res.status(500).json({ error: "Failed to add client" });
+  }
+});
+
+// Update client status (active/inactive)
+app.put("/api/coach/client/:clientId/status", requireCoachAuth, async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { status } = req.body || {};
+
+    if (!status || !['active', 'inactive'].includes(status)) {
+      return res.status(400).json({ error: "Invalid status. Must be 'active' or 'inactive'" });
+    }
+
+    // Verify client belongs to this coach
+    const clientResult = await db.query(
+      "SELECT id FROM users WHERE id = $1 AND app_id = $2",
+      [clientId, req.coach.id]
+    );
+
+    if (clientResult.rows.length === 0) {
+      return res.status(404).json({ error: "Client not found" });
+    }
+
+    await db.query(
+      "UPDATE users SET status = $1 WHERE id = $2",
+      [status, clientId]
+    );
+
+    return res.json({ ok: true, message: `Client ${status === 'active' ? 'activated' : 'deactivated'}` });
+  } catch (err) {
+    console.error("Error in PUT /api/coach/client/:clientId/status:", err);
+    return res.status(500).json({ error: "Failed to update client status" });
   }
 });
 
@@ -3331,66 +3393,40 @@ app.get("/api/me", requireAuth, async (req, res) => {
 // List recent clarity sessions (thread list)
 app.get("/api/sessions", requireAuth, async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50);
+    const offset = parseInt(req.query.offset, 10) || 0;
     const effectiveAppId = req.tenant?.id || APP_ID;
 
     const result = await db.query(
-      `
-      WITH base AS (
-        SELECT
-          id,
-          user_id,
-          COALESCE(thread_id, id) AS thread_key,
-          input_prompt,
-          created_at,
-          turn_index
-        FROM sessions
-        WHERE user_id = $1
-          AND app_id = $2
-      ),
-      per_thread AS (
-        SELECT
-          thread_key,
-          MIN(created_at) AS started_at,
-          MAX(created_at) AS last_updated_at,
-          MAX(
-            CASE
-              WHEN turn_index IS NULL OR turn_index = 0 THEN input_prompt
-              ELSE NULL
-            END
-          ) AS first_user_message
-        FROM base
-        GROUP BY thread_key
-      )
-      SELECT
-        thread_key,
-        started_at,
-        last_updated_at,
-        first_user_message
-      FROM per_thread
-      ORDER BY last_updated_at DESC
-      LIMIT $3
-      `,
-      [req.user.id, effectiveAppId, limit]
+      `SELECT id, thread_id, input_prompt, status, turn_count, summary, created_at, closed_at
+       FROM sessions
+       WHERE user_id = $1 AND app_id = $2
+       ORDER BY created_at DESC
+       LIMIT $3 OFFSET $4`,
+      [req.user.id, effectiveAppId, limit, offset]
     );
-
 
     function makeTitle(text) {
       if (!text) return "Clarity session";
       let t = String(text).replace(/\s+/g, " ").trim();
       if (!t) return "Clarity session";
-      if (t.length > 140) t = t.slice(0, 137) + "…";
+      if (t.length > 100) t = t.slice(0, 97) + "...";
       return t;
     }
 
-    const threads = result.rows.map((row) => ({
-      threadId: row.thread_key,
-      startedAt: row.started_at,
-      lastUpdatedAt: row.last_updated_at,
-      title: makeTitle(row.first_user_message),
+    const sessions = result.rows.map((row) => ({
+      id: row.id,
+      threadId: row.thread_id || row.id,
+      title: makeTitle(row.input_prompt),
+      topic: makeTitle(row.input_prompt),
+      status: row.status || 'active',
+      turnCount: row.turn_count || 0,
+      summary: row.summary,
+      createdAt: row.created_at,
+      closedAt: row.closed_at,
     }));
 
-    return res.json(threads);
+    return res.json(sessions);
   } catch (err) {
     console.error("Error in GET /api/sessions:", err);
     return res.status(500).json({ error: "Server error" });
@@ -3401,42 +3437,48 @@ app.get("/api/sessions", requireAuth, async (req, res) => {
 app.get("/api/threads/:threadId", requireAuth, async (req, res) => {
   try {
     const { threadId } = req.params;
+    const effectiveAppId = req.tenant?.id || APP_ID;
 
-    const result = await db.query(
-      `
-      SELECT
-        id,
-        thread_id,
-        input_prompt,
-        cleaned_output,
-        raw_output,
-        created_at,
-        turn_index
-      FROM sessions
-      WHERE user_id = $1
-        AND app_id = $2
-        AND thread_id = $3
-      ORDER BY turn_index ASC, created_at ASC
-      `,
-      [req.user.id, APP_ID, threadId]
+    // First get the session to find session ID
+    const sessionResult = await db.query(
+      `SELECT id, thread_id, input_prompt, status, summary
+       FROM sessions
+       WHERE user_id = $1 AND app_id = $2 AND thread_id = $3`,
+      [req.user.id, effectiveAppId, threadId]
     );
 
-
-    if (result.rows.length === 0) {
+    if (sessionResult.rows.length === 0) {
       return res.status(404).json({ error: "Thread not found" });
     }
 
-    const messages = result.rows.map((row) => ({
+    const session = sessionResult.rows[0];
+
+    // Get all interactions for this session
+    const interactionsResult = await db.query(
+      `SELECT id, turn_number, user_message, ai_response, created_at
+       FROM interactions
+       WHERE session_id = $1
+       ORDER BY turn_number ASC`,
+      [session.id]
+    );
+
+    // Build messages array in the format expected by the frontend
+    const messages = interactionsResult.rows.map((row) => ({
       id: row.id,
-      threadId: row.thread_id,
-      inputPrompt: row.input_prompt || "",
-      cleanedOutput: row.cleaned_output || "",
-      rawOutput: row.raw_output || "",
+      threadId: threadId,
+      inputPrompt: row.user_message || "",
+      cleanedOutput: row.ai_response || "",
+      rawOutput: row.ai_response || "",
       createdAt: row.created_at,
-      turnIndex: row.turn_index,
+      turnIndex: row.turn_number,
     }));
 
-    return res.json({ threadId, messages });
+    return res.json({
+      threadId,
+      messages,
+      status: session.status,
+      summary: session.summary
+    });
   } catch (err) {
     console.error("Error in GET /api/threads/:threadId:", err);
     return res.status(500).json({ error: "Server error" });
@@ -3780,60 +3822,14 @@ app.post("/api/ai/end-session", requireAuth, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------
-// Get session history for a user
-// ---------------------------------------------------------------------
-app.get("/api/sessions", requireAuth, async (req, res) => {
-  try {
-    const effectiveAppId = req.tenant?.id || APP_ID;
-    const { status, limit = 20, offset = 0 } = req.query;
-
-    let query = `
-      SELECT s.id, s.thread_id, s.input_prompt, s.status, s.turn_count, s.summary,
-             s.created_at, s.closed_at,
-             (SELECT COUNT(*) FROM interactions WHERE session_id = s.id) as interaction_count
-      FROM sessions s
-      WHERE s.user_id = $1 AND s.app_id = $2
-    `;
-    const params = [req.user.id, effectiveAppId];
-
-    if (status) {
-      query += ` AND s.status = $3`;
-      params.push(status);
-    }
-
-    query += ` ORDER BY s.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    params.push(parseInt(limit, 10), parseInt(offset, 10));
-
-    const result = await db.query(query, params);
-
-    return res.json({
-      success: true,
-      sessions: result.rows.map((s) => ({
-        id: s.id,
-        threadId: s.thread_id,
-        topic: s.input_prompt?.substring(0, 100) + (s.input_prompt?.length > 100 ? "..." : ""),
-        status: s.status,
-        turnCount: s.turn_count || s.interaction_count,
-        summary: s.summary,
-        createdAt: s.created_at,
-        closedAt: s.closed_at,
-      })),
-    });
-  } catch (err) {
-    console.error("Error in GET /api/sessions:", err);
-    return res.status(500).json({ error: "Failed to fetch sessions" });
-  }
-});
-
-// ---------------------------------------------------------------------
-// Get single session with all interactions
+// Get single session with full conversation
 // ---------------------------------------------------------------------
 app.get("/api/sessions/:sessionId", requireAuth, async (req, res) => {
   try {
     const { sessionId } = req.params;
     const effectiveAppId = req.tenant?.id || APP_ID;
 
-    // Get session
+    // Get the session to find its thread_id
     const sessionResult = await db.query(
       `SELECT id, thread_id, input_prompt, status, turn_count, summary, created_at, closed_at
        FROM sessions WHERE id = $1 AND user_id = $2 AND app_id = $3`,
@@ -3845,31 +3841,34 @@ app.get("/api/sessions/:sessionId", requireAuth, async (req, res) => {
     }
 
     const session = sessionResult.rows[0];
+    const threadId = session.thread_id || session.id;
 
-    // Get all interactions
-    const interactionsResult = await db.query(
-      `SELECT id, turn_number, user_message, ai_response, created_at
-       FROM interactions WHERE session_id = $1 ORDER BY turn_number`,
-      [sessionId]
+    // Get all turns in this thread (full conversation)
+    const turnsResult = await db.query(
+      `SELECT id, turn_index, input_prompt, cleaned_output, raw_output, created_at
+       FROM sessions
+       WHERE thread_id = $1 AND user_id = $2 AND app_id = $3
+       ORDER BY turn_index ASC, created_at ASC`,
+      [threadId, req.user.id, effectiveAppId]
     );
 
     return res.json({
       success: true,
       session: {
         id: session.id,
-        threadId: session.thread_id,
+        threadId: threadId,
         topic: session.input_prompt,
         status: session.status,
-        turnCount: session.turn_count,
+        turnCount: session.turn_count || turnsResult.rows.length,
         summary: session.summary,
         createdAt: session.created_at,
         closedAt: session.closed_at,
-        interactions: interactionsResult.rows.map((i) => ({
-          id: i.id,
-          turnNumber: i.turn_number,
-          userMessage: i.user_message,
-          aiResponse: i.ai_response,
-          createdAt: i.created_at,
+        turns: turnsResult.rows.map((t) => ({
+          id: t.id,
+          turnIndex: t.turn_index,
+          userMessage: t.input_prompt,
+          aiResponse: t.cleaned_output || t.raw_output,
+          createdAt: t.created_at,
         })),
       },
     });

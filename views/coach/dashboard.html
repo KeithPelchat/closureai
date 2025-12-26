@@ -153,6 +153,36 @@
       color: #16a34a;
     }
 
+    .btn-status {
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-status.active {
+      background: rgba(34, 197, 94, 0.15);
+      color: #16a34a;
+    }
+
+    .btn-status.active:hover {
+      background: rgba(239, 68, 68, 0.15);
+      color: #dc2626;
+    }
+
+    .btn-status.inactive {
+      background: rgba(100, 116, 139, 0.15);
+      color: #64748b;
+    }
+
+    .btn-status.inactive:hover {
+      background: rgba(34, 197, 94, 0.15);
+      color: #16a34a;
+    }
+
     .empty-state {
       text-align: center;
       padding: 48px 24px;
@@ -321,13 +351,13 @@
           </div>
         </div>
 
-        <!-- Grant Access -->
+        <!-- Add Client -->
         <div class="admin-card" style="margin-top: 24px;">
           <div class="admin-card-header">
-            <h2 class="admin-card-title">Grant Client Access</h2>
+            <h2 class="admin-card-title">Add Client</h2>
           </div>
           <div class="admin-card-body">
-            <div class="grant-access-form">
+            <div class="grant-access-form" style="grid-template-columns: 1fr 1fr auto;">
               <div class="form-group">
                 <label>Email</label>
                 <input type="email" id="grant-email" placeholder="client@example.com" />
@@ -336,17 +366,7 @@
                 <label>Name (optional)</label>
                 <input type="text" id="grant-name" placeholder="Client Name" />
               </div>
-              <div class="form-group">
-                <label>Access Duration</label>
-                <select id="grant-days">
-                  <option value="30">30 days</option>
-                  <option value="60">60 days</option>
-                  <option value="90">90 days</option>
-                  <option value="180">6 months</option>
-                  <option value="365">1 year</option>
-                </select>
-              </div>
-              <button type="button" class="btn-grant" id="grant-btn">Grant Access</button>
+              <button type="button" class="btn-grant" id="grant-btn">Add Client</button>
             </div>
           </div>
         </div>
@@ -448,7 +468,7 @@
                 <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
-              <p>No clients yet. Grant access to your first client above!</p>
+              <p>No clients yet. Add your first client above!</p>
             </div>
           `;
           return;
@@ -462,7 +482,7 @@
                 <th>Name</th>
                 <th>Sessions</th>
                 <th>Last Active</th>
-                <th>Access Expires</th>
+                <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -473,7 +493,13 @@
                   <td>${escapeHtml(c.name) || '-'}</td>
                   <td>${c.sessionCount}</td>
                   <td>${formatDate(c.lastSession)}</td>
-                  <td>${formatDate(c.accessExpiresAt)}</td>
+                  <td>
+                    <button class="btn-status ${c.status === 'active' ? 'active' : 'inactive'}"
+                            onclick="toggleClientStatus('${c.id}', '${c.status}')"
+                            title="Click to ${c.status === 'active' ? 'deactivate' : 'activate'}">
+                      ${c.status === 'active' ? 'Active' : 'Inactive'}
+                    </button>
+                  </td>
                   <td>
                     <a href="/my-app/client/${c.id}/sessions" class="btn-view-sessions">View Sessions</a>
                   </td>
@@ -498,11 +524,10 @@
       setTimeout(() => btn.textContent = 'Copy', 2000);
     });
 
-    // Grant access
+    // Add client
     document.getElementById('grant-btn').addEventListener('click', async () => {
       const email = document.getElementById('grant-email').value.trim();
       const name = document.getElementById('grant-name').value.trim();
-      const days = document.getElementById('grant-days').value;
       const btn = document.getElementById('grant-btn');
 
       if (!email) {
@@ -511,31 +536,31 @@
       }
 
       btn.disabled = true;
-      btn.textContent = 'Granting...';
+      btn.textContent = 'Adding...';
 
       try {
-        const res = await fetch('/api/coach/grant-access', {
+        const res = await fetch('/api/coach/add-client', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, name, days: parseInt(days, 10) }),
+          body: JSON.stringify({ email, name }),
         });
 
         const data = await res.json();
 
         if (data.ok) {
-          alert(`Access granted to ${email} for ${days} days.`);
+          alert(`Client ${email} added successfully.`);
           document.getElementById('grant-email').value = '';
           document.getElementById('grant-name').value = '';
           loadClients();
           loadDashboard();
         } else {
-          alert(data.error || 'Failed to grant access.');
+          alert(data.error || 'Failed to add client.');
         }
       } catch (err) {
         alert('Network error. Please try again.');
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Grant Access';
+        btn.textContent = 'Add Client';
       }
     });
 
@@ -555,6 +580,34 @@
     // Export clients as CSV
     function exportClients() {
       window.location.href = '/api/coach/clients/export';
+    }
+
+    // Toggle client status (active/inactive)
+    async function toggleClientStatus(clientId, currentStatus) {
+      const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      const action = newStatus === 'active' ? 'activate' : 'deactivate';
+
+      if (!confirm(`Are you sure you want to ${action} this client?`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/coach/client/${clientId}/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus }),
+        });
+
+        const data = await res.json();
+
+        if (data.ok) {
+          loadClients();
+        } else {
+          alert(data.error || 'Failed to update status.');
+        }
+      } catch (err) {
+        alert('Network error. Please try again.');
+      }
     }
 
     // Initialize
