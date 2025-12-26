@@ -495,14 +495,17 @@ async function findOrCreateUser({ email, name, ghlContactId, appId = null, autoG
   return result.rows[0];
 }
 
-async function createMagicLink(userId) {
+async function createMagicLink(userId, appId) {
   const token = crypto.randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
 
+  // Use provided appId or fall back to global APP_ID
+  const effectiveAppId = appId || APP_ID;
+
   await db.query(
-    `INSERT INTO magic_links (user_id, token, expires_at)
-     VALUES ($1, $2, $3)`,
-    [userId, token, expires]
+    `INSERT INTO magic_links (user_id, token, expires_at, app_id)
+     VALUES ($1, $2, $3, $4)`,
+    [userId, token, expires, effectiveAppId]
   );
 
   // Use app base URL from config
@@ -1131,7 +1134,7 @@ async function handlePaidUser(session) {
     session
   );
 
-  const loginUrl = await createMagicLink(user.id);
+  const loginUrl = await createMagicLink(user.id, user.app_id);
 
   await sendMagicLinkEmail({
     to: user.email,
@@ -2092,7 +2095,7 @@ app.post("/auth/secure-link", async (req, res) => {
       sendLeadNotification: true,
     });
 
-    const loginUrl = await createMagicLink(user.id);
+    const loginUrl = await createMagicLink(user.id, user.app_id);
 
     await sendMagicLinkEmail({
       to: user.email,
@@ -3075,7 +3078,7 @@ app.post("/ghl/new-user", async (req, res) => {
       sendLeadNotification: true,
     });
 
-    const loginUrl = await createMagicLink(user.id);
+    const loginUrl = await createMagicLink(user.id, user.app_id);
 
     return res.json({ success: true, loginUrl });
   } catch (err) {
