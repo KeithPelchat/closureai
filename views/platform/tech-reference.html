@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Technical Reference - ClosureAI Platform</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+  <link rel="stylesheet" href="/css/platform.css" />
+  <style>
+    .doc-content {
+      max-width: 900px;
+    }
+    .doc-content h2 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 32px 0 16px 0;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .doc-content h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1e293b;
+      margin: 24px 0 12px 0;
+    }
+    .doc-content h4 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #334155;
+      margin: 20px 0 10px 0;
+    }
+    .doc-content p {
+      color: #475569;
+      line-height: 1.7;
+      margin: 0 0 16px 0;
+    }
+    .doc-content ul, .doc-content ol {
+      color: #475569;
+      line-height: 1.7;
+      margin: 0 0 16px 0;
+      padding-left: 24px;
+    }
+    .doc-content li {
+      margin-bottom: 8px;
+    }
+    .doc-content code {
+      background: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 13px;
+      color: #0f172a;
+    }
+    .doc-content pre {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 0 0 16px 0;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .doc-content pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+    .doc-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 16px 0;
+      font-size: 14px;
+    }
+    .doc-content th, .doc-content td {
+      padding: 10px 12px;
+      border: 1px solid #e2e8f0;
+      text-align: left;
+    }
+    .doc-content th {
+      background: #f8fafc;
+      font-weight: 600;
+      color: #0f172a;
+    }
+    .doc-content td {
+      color: #475569;
+    }
+    .doc-toc {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .doc-toc h4 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .doc-toc ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      columns: 2;
+    }
+    .doc-toc li {
+      margin-bottom: 8px;
+    }
+    .doc-toc a {
+      color: #6366f1;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .doc-toc a:hover {
+      text-decoration: underline;
+    }
+    .doc-section {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .doc-section h2:first-child {
+      margin-top: 0;
+    }
+    .ascii-diagram {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 12px;
+      line-height: 1.4;
+      white-space: pre;
+      color: #334155;
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <a href="/platform" class="admin-sidebar-brand">
+          <div class="admin-sidebar-brand-mark"></div>
+          <div>
+            <div class="admin-sidebar-title">ClosureAI</div>
+            <div class="admin-badge">Platform</div>
+          </div>
+        </a>
+      </div>
+
+      <nav class="admin-sidebar-nav">
+        <a href="/platform" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          Dashboard
+        </a>
+        <a href="/platform/pending" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Pending Review
+        </a>
+        <a href="/platform/coaches" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          All Coaches
+        </a>
+        <div style="border-top: 1px solid rgba(255,255,255,0.1); margin: 16px 0;"></div>
+        <a href="/platform/tech-reference" class="admin-nav-item active">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Tech Reference
+        </a>
+        <a href="/platform/sop-manual" class="admin-nav-item">
+          <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          SOP Manual
+        </a>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <a href="/dashboard" class="admin-back-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back to App
+        </a>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-header">
+        <h1 class="admin-header-title">Technical Reference</h1>
+        <span style="color: #64748b; font-size: 14px;">Version 2.0 - December 2024</span>
+      </header>
+
+      <div class="admin-content doc-content">
+        <div class="doc-toc">
+          <h4>Table of Contents</h4>
+          <ul>
+            <li><a href="#system-overview">System Overview</a></li>
+            <li><a href="#architecture">Architecture</a></li>
+            <li><a href="#user-flows">User Flows</a></li>
+            <li><a href="#database-schema">Database Schema</a></li>
+            <li><a href="#api-reference">API Reference</a></li>
+            <li><a href="#multi-tenancy">Multi-Tenancy</a></li>
+            <li><a href="#ai-integration">AI Integration</a></li>
+            <li><a href="#email-system">Email System</a></li>
+            <li><a href="#authentication">Authentication</a></li>
+            <li><a href="#deployment">Deployment & Operations</a></li>
+          </ul>
+        </div>
+
+        <div class="doc-section" id="system-overview">
+          <h2>System Overview</h2>
+          <p>ClosureAI is a multi-tenant AI coaching platform that enables coaches to deploy white-labeled, AI-powered clarity sessions for their clients.</p>
+
+          <h3>Core Value Proposition</h3>
+          <ul>
+            <li><strong>For Coaches:</strong> Lead generation tool that replaces static lead magnets with interactive AI sessions</li>
+            <li><strong>For Users:</strong> Free, guided coaching sessions that provide clarity and actionable next steps</li>
+          </ul>
+
+          <h3>Key Features</h3>
+          <ul>
+            <li>Multi-tenant architecture (subdomain + custom domain support)</li>
+            <li>White-label branding (logo, colors)</li>
+            <li>AI coaching sessions with configurable turn limits</li>
+            <li>Offer/CTA injection (mid-session + wrap-up)</li>
+            <li>Lead capture with email notifications to coaches</li>
+            <li>Partner/affiliate referral system</li>
+          </ul>
+        </div>
+
+        <div class="doc-section" id="architecture">
+          <h2>Architecture</h2>
+
+          <h3>Technology Stack</h3>
+          <table>
+            <tr><th>Layer</th><th>Technology</th></tr>
+            <tr><td>Backend</td><td>Node.js + Express.js</td></tr>
+            <tr><td>Database</td><td>PostgreSQL (AWS RDS)</td></tr>
+            <tr><td>AI</td><td>OpenAI GPT-4 API</td></tr>
+            <tr><td>Hosting</td><td>AWS EC2 + PM2</td></tr>
+            <tr><td>Web Server</td><td>Nginx (reverse proxy + SSL)</td></tr>
+            <tr><td>CDN/DNS</td><td>Cloudflare</td></tr>
+            <tr><td>Payments</td><td>Stripe</td></tr>
+            <tr><td>Email</td><td>AWS SES</td></tr>
+          </table>
+
+          <h3>Server Configuration</h3>
+          <pre><code>Application Port: 3200
+Process Manager: PM2 (process name: closureai)
+File Location: /var/www/closureai/
+Nginx Config: /etc/nginx/conf.d/closureai.conf</code></pre>
+
+          <h3>File Structure</h3>
+          <pre><code>/var/www/closureai/
+├── closureai.js           # Main Express application
+├── db.js                  # Database connection
+├── package.json           # Dependencies
+├── config/
+│   ├── appConfig.js       # App-wide settings
+│   ├── promptsConfig.js   # AI prompt templates
+│   └── stripeConfig.js    # Stripe settings
+├── email/
+│   └── sesEmail.js        # Email functions (SES)
+├── public/                # Static assets
+└── views/                 # HTML templates
+    ├── coach/             # Coach dashboard views
+    ├── platform/          # Platform admin views
+    └── partner/           # Partner views</code></pre>
+        </div>
+
+        <div class="doc-section" id="user-flows">
+          <h2>User Flows</h2>
+
+          <h3>End User Journey</h3>
+          <div class="ascii-diagram">User visits coach subdomain → Landing Page → Login/Register → Dashboard → Start Session → AI Coaching (6 turns) → Wrap-up + Offer</div>
+
+          <h3>Coach Onboarding</h3>
+          <div class="ascii-diagram">Coach visits /onboard → Stripe Checkout → Onboarding Form → Status: pending_review → Admin Approves → Status: active → Coach accesses /my-app</div>
+
+          <h3>AI Session Flow</h3>
+          <ol>
+            <li><code>POST /api/ai/closure</code> - User sends message</li>
+            <li><code>requireAuth()</code> - Verify JWT and load user</li>
+            <li>Resolve context (app profile, offers)</li>
+            <li>Build system prompt with coach customizations</li>
+            <li>Call OpenAI API (gpt-4.1-mini)</li>
+            <li>Save to database (sessions + interactions)</li>
+            <li>Return response with turn info and offers</li>
+          </ol>
+        </div>
+
+        <div class="doc-section" id="database-schema">
+          <h2>Database Schema</h2>
+
+          <h3>Core Tables</h3>
+          <table>
+            <tr><th>Table</th><th>Purpose</th></tr>
+            <tr><td><code>apps</code></td><td>Coach accounts and settings</td></tr>
+            <tr><td><code>users</code></td><td>End users (clients)</td></tr>
+            <tr><td><code>sessions</code></td><td>Coaching sessions</td></tr>
+            <tr><td><code>interactions</code></td><td>Individual conversation turns</td></tr>
+            <tr><td><code>offers</code></td><td>Coach CTAs/offers</td></tr>
+            <tr><td><code>partners</code></td><td>Affiliate partners</td></tr>
+            <tr><td><code>commissions</code></td><td>Partner earnings</td></tr>
+            <tr><td><code>prompts</code></td><td>Versioned AI prompts</td></tr>
+          </table>
+
+          <h3>Key Status Values</h3>
+          <h4>App Status (apps.status)</h4>
+          <table>
+            <tr><th>Status</th><th>Description</th><th>Subdomain Active</th></tr>
+            <tr><td><code>pending_onboarding</code></td><td>Paid, form not done</td><td>No</td></tr>
+            <tr><td><code>pending_review</code></td><td>Awaiting approval</td><td>No</td></tr>
+            <tr><td><code>active</code></td><td>Live</td><td>Yes</td></tr>
+            <tr><td><code>suspended</code></td><td>Admin suspended</td><td>No</td></tr>
+            <tr><td><code>cancelled</code></td><td>Subscription ended</td><td>No</td></tr>
+          </table>
+        </div>
+
+        <div class="doc-section" id="api-reference">
+          <h2>API Reference</h2>
+
+          <h3>Authentication Endpoints</h3>
+          <table>
+            <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+            <tr><td>POST</td><td><code>/auth/register</code></td><td>Register new user</td></tr>
+            <tr><td>POST</td><td><code>/auth/login</code></td><td>Login with email/password</td></tr>
+            <tr><td>GET</td><td><code>/auth/google</code></td><td>Start Google OAuth</td></tr>
+            <tr><td>POST</td><td><code>/auth/secure-link</code></td><td>Request magic link</td></tr>
+            <tr><td>POST</td><td><code>/auth/forgot-password</code></td><td>Request password reset</td></tr>
+          </table>
+
+          <h3>Coach Endpoints</h3>
+          <table>
+            <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+            <tr><td>GET</td><td><code>/api/coach/profile</code></td><td>Get coach profile</td></tr>
+            <tr><td>PUT</td><td><code>/api/coach/profile</code></td><td>Update profile</td></tr>
+            <tr><td>GET</td><td><code>/api/coach/stats</code></td><td>Dashboard statistics</td></tr>
+            <tr><td>GET</td><td><code>/api/coach/clients</code></td><td>List clients</td></tr>
+            <tr><td>GET/POST/PUT/DELETE</td><td><code>/api/coach/offers</code></td><td>Manage offers</td></tr>
+          </table>
+
+          <h3>Platform Admin Endpoints</h3>
+          <table>
+            <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+            <tr><td>GET</td><td><code>/api/platform/stats</code></td><td>Platform statistics</td></tr>
+            <tr><td>GET</td><td><code>/api/platform/coaches</code></td><td>List all coaches</td></tr>
+            <tr><td>POST</td><td><code>/api/platform/coaches/:id/approve</code></td><td>Approve coach</td></tr>
+            <tr><td>POST</td><td><code>/api/platform/coaches/:id/suspend</code></td><td>Suspend coach</td></tr>
+          </table>
+        </div>
+
+        <div class="doc-section" id="multi-tenancy">
+          <h2>Multi-Tenancy</h2>
+
+          <h3>Domain Resolution</h3>
+          <ol>
+            <li>Extract hostname from request</li>
+            <li>Check if main domain (getclosureai.com) → use global APP_ID</li>
+            <li>Check if subdomain (*.getclosureai.com) → lookup by subdomain</li>
+            <li>Otherwise → lookup by custom_domain</li>
+            <li>Attach app data to <code>req.tenant</code></li>
+          </ol>
+
+          <h3>Tenant Isolation</h3>
+          <p>All queries must filter by <code>app_id</code>:</p>
+          <pre><code>// Good - tenant isolated
+const users = await db.query(
+  "SELECT * FROM users WHERE app_id = $1",
+  [req.tenant?.id || APP_ID]
+);
+
+// Bad - leaks data
+const users = await db.query("SELECT * FROM users");</code></pre>
+        </div>
+
+        <div class="doc-section" id="ai-integration">
+          <h2>AI Integration</h2>
+
+          <h3>Prompt Building Pipeline</h3>
+          <ol>
+            <li><code>getAppProfile(appId)</code> - Load coach profile and active prompt</li>
+            <li><code>buildCoachBasePrompt()</code> - Priority: prompts table → custom_system_prompt → template</li>
+            <li><code>buildSystemPrompt()</code> - Add offer injection instructions</li>
+          </ol>
+
+          <h3>Offer Injection</h3>
+          <ul>
+            <li><strong>Midpoint (turn 3):</strong> Brief mention of coach's resource</li>
+            <li><strong>Wrap-up (turn 6):</strong> PS mentioning next-step resources</li>
+          </ul>
+
+          <h3>Model Configuration</h3>
+          <pre><code>Model: gpt-4.1-mini (or CLOSUREAI_MODEL env var)
+Temperature: 0.7
+Max Tokens: 800
+Max Turns: 6 (or CLOSUREAI_MAX_TURNS env var)</code></pre>
+        </div>
+
+        <div class="doc-section" id="email-system">
+          <h2>Email System</h2>
+
+          <h3>Email Functions (email/sesEmail.js)</h3>
+          <table>
+            <tr><th>Function</th><th>Purpose</th></tr>
+            <tr><td><code>sendMagicLinkEmail</code></td><td>Send login link</td></tr>
+            <tr><td><code>sendVerificationEmail</code></td><td>Verify email address</td></tr>
+            <tr><td><code>sendPasswordResetEmail</code></td><td>Password reset link</td></tr>
+            <tr><td><code>sendLeadNotificationEmail</code></td><td>Notify coach of new lead</td></tr>
+          </table>
+        </div>
+
+        <div class="doc-section" id="authentication">
+          <h2>Authentication</h2>
+
+          <h3>Auth Middleware</h3>
+          <table>
+            <tr><th>Middleware</th><th>Cookie</th><th>Purpose</th></tr>
+            <tr><td><code>requireAuth</code></td><td>closureai_auth</td><td>End users</td></tr>
+            <tr><td><code>requireCoachAuth</code></td><td>closureai_client_auth</td><td>Coaches</td></tr>
+            <tr><td><code>requirePartnerAuth</code></td><td>closureai_partner_auth</td><td>Partners</td></tr>
+            <tr><td><code>requirePlatformAdmin</code></td><td>closureai_auth + email check</td><td>Platform owner</td></tr>
+          </table>
+        </div>
+
+        <div class="doc-section" id="deployment">
+          <h2>Deployment & Operations</h2>
+
+          <h3>PM2 Commands</h3>
+          <pre><code># Start/Restart
+pm2 start closureai.js --name closureai
+pm2 restart closureai
+
+# Logs
+pm2 logs closureai --lines 100
+
+# Status
+pm2 status</code></pre>
+
+          <h3>Key Environment Variables</h3>
+          <pre><code>DATABASE_URL=postgresql://...
+JWT_SECRET=...
+OPENAI_API_KEY=sk-...
+STRIPE_SECRET_KEY=sk_live_...
+GOOGLE_CLIENT_ID=...
+AWS_ACCESS_KEY_ID=...
+PLATFORM_ADMIN_EMAILS=keith@hypergen.ai</code></pre>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

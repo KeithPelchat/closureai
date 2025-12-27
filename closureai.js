@@ -77,6 +77,9 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || "";
 
+// Platform admin emails (for /platform access)
+const PLATFORM_ADMINS = (process.env.PLATFORM_ADMIN_EMAILS || "keith@hypergen.ai").split(",").map(e => e.trim().toLowerCase());
+
 // ---------------------------------------------------------------------
 // CORS (safe for everything, including Stripe)
 // Allow any *.getclosureai.com subdomain + custom domains for multi-tenant
@@ -802,16 +805,31 @@ async function requireAuth(req, res, next) {
   try {
     const payload = jwt.verify(token, JWT_SECRET);
 
-    // Scope user lookup by app_id to ensure multi-tenant isolation
-    const appId = req.tenant?.id || APP_ID;
-    const result = await db.query("SELECT * FROM users WHERE id = $1 AND app_id = $2", [
-      payload.userId,
-      appId,
-    ]);
+    // Platform routes should not be tenant-scoped (platform admins may have user accounts in different tenants)
+    const isPlatformRoute = req.path.startsWith('/platform') || req.path.startsWith('/api/platform');
+
+    let result;
+    if (isPlatformRoute) {
+      // For platform routes, look up user globally (no tenant scoping)
+      result = await db.query("SELECT * FROM users WHERE id = $1", [payload.userId]);
+    } else {
+      // Scope user lookup by app_id to ensure multi-tenant isolation
+      const appId = req.tenant?.id || APP_ID;
+      result = await db.query("SELECT * FROM users WHERE id = $1 AND app_id = $2", [
+        payload.userId,
+        appId,
+      ]);
+
+      if (result.rows.length === 0) {
+        // User not found for this tenant - clear stale cookie and redirect to login
+        console.log(`[Auth] User ${payload.userId} not found for tenant ${appId} on ${req.path}`);
+        res.clearCookie('closureai_auth');
+        return respondUnauthorized(req, res);
+      }
+    }
 
     if (result.rows.length === 0) {
-      // User not found for this tenant - clear stale cookie and redirect to login
-      console.log(`[Auth] User ${payload.userId} not found for tenant ${appId} on ${req.path}`);
+      console.log(`[Auth] User ${payload.userId} not found on ${req.path}`);
       res.clearCookie('closureai_auth');
       return respondUnauthorized(req, res);
     }
@@ -1494,6 +1512,11 @@ app.get("/my-app/settings", requireCoachAuth, (req, res) => {
 // Coach branding page
 app.get("/my-app/branding", requireCoachAuth, (req, res) => {
   res.sendFile(path.join(__dirname, "views", "coach", "branding.html"));
+});
+
+// Coach: Getting Started / Onboarding Guide
+app.get("/my-app/onboarding-guide", requireCoachAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "coach", "onboarding-guide.html"));
 });
 
 // Coach logout
@@ -2431,10 +2454,16 @@ app.post("/auth/login", async (req, res) => {
 
     res.cookie('closureai_auth', jwtToken, cookieOptions)
 
-    // Redirect admins to platform dashboard, regular users to dashboard
-    const redirectTo = user.is_admin ? '/platform' : '/dashboard'
+    // Determine redirect: platform admins → /platform, coach admins → /my-app, users → /dashboard
+    let redirectTo = '/dashboard'
+    const isPlatformAdmin = PLATFORM_ADMINS.includes(normalizedEmail)
+    if (isPlatformAdmin) {
+      redirectTo = '/platform'
+    } else if (user.is_admin) {
+      redirectTo = '/my-app'
+    }
 
-    return res.json({ ok: true, user: { id: user.id, name: user.name, isAdmin: user.is_admin || false }, redirectTo })
+    return res.json({ ok: true, user: { id: user.id, name: user.name, isAdmin: user.is_admin || false, isPlatformAdmin }, redirectTo })
   } catch (err) {
     console.error('Error in /auth/login:', err)
     return res.status(500).json({ error: 'Login failed. Please try again.' })
@@ -3170,26 +3199,33 @@ app.get("/auth/google/callback", async (req, res) => {
       maxAge: 30 * 24 * 60 * 60 * 1000,
     };
 
-    // If returnHost is a subdomain of getclosureai.com, set cookie domain for sharing
-    if (returnHost && returnHost.endsWith(".getclosureai.com")) {
+    // Set cookie domain for getclosureai.com and all subdomains
+    if (returnHost && (returnHost === "getclosureai.com" || returnHost.endsWith(".getclosureai.com"))) {
       cookieOptions.domain = ".getclosureai.com";
     }
 
     res.cookie("closureai_auth", jwtToken, cookieOptions);
 
-    // Check if user is admin for redirect
-    const isAdmin = user.is_admin || false;
+    // Determine redirect: platform admins → /platform, coach admins → /my-app, users → /
+    const isPlatformAdmin = PLATFORM_ADMINS.includes(email.toLowerCase());
+    const isCoachAdmin = user.is_admin || false;
 
-    // Redirect back to the originating tenant subdomain (admins go to /platform)
-    let redirectUrl = isAdmin ? "/platform" : "/";
+    let redirectPath = "/";
+    if (isPlatformAdmin) {
+      redirectPath = "/platform";
+    } else if (isCoachAdmin) {
+      redirectPath = "/my-app";
+    }
+
+    let redirectUrl = redirectPath;
     if (returnHost && returnHost !== "getclosureai.com" && returnHost.endsWith(".getclosureai.com")) {
-      redirectUrl = `https://${returnHost}${isAdmin ? '/platform' : '/'}`;
+      redirectUrl = `https://${returnHost}${redirectPath}`;
     }
 
     console.log(
       "[Google OAuth] Login complete for",
       email,
-      isAdmin ? "(admin)" : "",
+      isPlatformAdmin ? "(platform admin)" : isCoachAdmin ? "(coach admin)" : "",
       "→ redirecting to",
       redirectUrl
     );
@@ -5327,9 +5363,6 @@ app.get("/api/admin/prompt-template", requireAdmin, async (req, res) => {
 // Onboarding Routes (Coach signup flow)
 // ---------------------------------------------------------------------
 
-// Platform admin emails (hardcoded for now)
-const PLATFORM_ADMINS = (process.env.PLATFORM_ADMIN_EMAILS || "keith@hypergen.ai").split(",").map(e => e.trim().toLowerCase());
-
 function requirePlatformAdmin(req, res, next) {
   if (!req.user || !PLATFORM_ADMINS.includes(req.user.email.toLowerCase())) {
     return res.status(403).json({ error: "Platform admin access required" });
@@ -5683,6 +5716,16 @@ app.get("/platform/coaches", requireAuth, requirePlatformAdmin, (req, res) => {
 
 app.get("/platform/coach/:id", requireAuth, requirePlatformAdmin, (req, res) => {
   return res.sendFile(path.join(__dirname, "views/platform/coach-detail.html"));
+});
+
+// Platform admin: Tech Reference
+app.get("/platform/tech-reference", requireAuth, requirePlatformAdmin, (req, res) => {
+  return res.sendFile(path.join(__dirname, "views/platform/tech-reference.html"));
+});
+
+// Platform admin: SOP Manual
+app.get("/platform/sop-manual", requireAuth, requirePlatformAdmin, (req, res) => {
+  return res.sendFile(path.join(__dirname, "views/platform/sop-manual.html"));
 });
 
 // Platform admin API
