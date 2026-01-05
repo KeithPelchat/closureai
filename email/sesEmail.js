@@ -723,9 +723,297 @@ async function sendLeadNotificationEmail({
   await sesClient.send(command);
 }
 
+/**
+ * HTML template for coach welcome/approval email.
+ */
+function buildCoachWelcomeHtml({ coachName, businessName, subdomain, customDomain, dashboardUrl }) {
+  const safeCoachName = coachName || "Coach";
+  const safeBusinessName = businessName || "Your Coaching App";
+
+  // Determine the app URL
+  let appUrl;
+  if (customDomain) {
+    appUrl = `https://${customDomain}`;
+  } else {
+    appUrl = `https://${subdomain}.getclosureai.com`;
+  }
+
+  return `
+  <!doctype html>
+  <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>Your ClosureAI App is Live!</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <style>
+        body {
+          margin: 0;
+          padding: 0;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          background: #f9fafb;
+          color: #1f2937;
+        }
+        .wrapper {
+          width: 100%;
+          padding: 32px 0;
+        }
+        .card {
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 32px;
+          border-radius: 16px;
+          background: #ffffff;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+          border: 1px solid #e5e7eb;
+        }
+        .logo {
+          text-align: center;
+          margin-bottom: 24px;
+        }
+        .logo span {
+          font-size: 28px;
+          font-weight: bold;
+          color: #0d9488;
+        }
+        h1 {
+          font-size: 24px;
+          margin: 0 0 16px;
+          color: #0d9488;
+        }
+        h2 {
+          font-size: 16px;
+          margin: 24px 0 8px;
+          color: #374151;
+        }
+        p {
+          font-size: 15px;
+          line-height: 1.6;
+          margin: 0 0 16px;
+        }
+        .url-box {
+          background: #f3f4f6;
+          padding: 16px;
+          border-radius: 8px;
+          margin: 16px 0;
+          font-family: monospace;
+          font-size: 14px;
+          word-break: break-all;
+        }
+        .url-box a {
+          color: #0d9488;
+          text-decoration: none;
+        }
+        .btn {
+          display: inline-block;
+          margin-top: 16px;
+          padding: 14px 28px;
+          border-radius: 8px;
+          background: #0d9488;
+          color: #ffffff !important;
+          font-weight: 600;
+          font-size: 15px;
+          text-decoration: none;
+        }
+        .steps {
+          background: #f0fdfa;
+          padding: 20px;
+          border-radius: 8px;
+          margin: 24px 0;
+          border-left: 4px solid #0d9488;
+        }
+        .steps ol {
+          margin: 0;
+          padding-left: 20px;
+        }
+        .steps li {
+          margin-bottom: 8px;
+        }
+        .footer {
+          font-size: 13px;
+          color: #6b7280;
+          margin-top: 32px;
+          padding-top: 24px;
+          border-top: 1px solid #e5e7eb;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="wrapper">
+        <div class="card">
+          <div class="logo">
+            <span>ClosureAI</span>
+          </div>
+
+          <h1>Your AI Coaching App is Live!</h1>
+
+          <p>Hi ${safeCoachName},</p>
+
+          <p>Great news — <strong>${safeBusinessName}</strong> is now live and ready to start generating leads!</p>
+
+          <h2>Your App URL</h2>
+          <div class="url-box">
+            <a href="${appUrl}">${appUrl}</a>
+          </div>
+          <p style="font-size: 13px; color: #6b7280;">Share this link with your audience. When they visit, they'll see your branded landing page and can sign up for a free coaching session.</p>
+
+          <h2>Your Dashboard</h2>
+          <div class="url-box">
+            <a href="${dashboardUrl}">${dashboardUrl}</a>
+          </div>
+          <p style="font-size: 13px; color: #6b7280;">Log in with Google or the email you registered with to manage your app, view leads, and update settings.</p>
+
+          <div class="steps">
+            <strong>What to do next:</strong>
+            <ol>
+              <li>Log into your dashboard and review your branding</li>
+              <li>Set up your offers (the products/services you want to promote)</li>
+              <li>Test your app by running through a coaching session yourself</li>
+              <li>Share your link with clients and on social media!</li>
+            </ol>
+          </div>
+
+          <h2>Getting Leads</h2>
+          <p>When someone signs up on your app, you'll receive an email notification with their contact info. You can also export all leads from your dashboard at any time.</p>
+
+          <p style="text-align: center;">
+            <a href="${dashboardUrl}" class="btn">Go to Your Dashboard</a>
+          </p>
+
+          <p class="footer">
+            Need help? Just reply to this email and we'll get back to you.<br><br>
+            Welcome aboard!<br>
+            — Keith
+          </p>
+        </div>
+      </div>
+    </body>
+  </html>
+  `;
+}
+
+/**
+ * Plain-text fallback for coach welcome email.
+ */
+function buildCoachWelcomeText({ coachName, businessName, subdomain, customDomain, dashboardUrl }) {
+  const safeCoachName = coachName || "Coach";
+  const safeBusinessName = businessName || "Your Coaching App";
+
+  let appUrl;
+  if (customDomain) {
+    appUrl = `https://${customDomain}`;
+  } else {
+    appUrl = `https://${subdomain}.getclosureai.com`;
+  }
+
+  return [
+    `Your AI Coaching App is Live!`,
+    "",
+    `Hi ${safeCoachName},`,
+    "",
+    `Great news — ${safeBusinessName} is now live and ready to start generating leads!`,
+    "",
+    "YOUR APP URL:",
+    appUrl,
+    "(Share this with your audience)",
+    "",
+    "YOUR DASHBOARD:",
+    dashboardUrl,
+    "(Log in with Google or your registered email)",
+    "",
+    "WHAT TO DO NEXT:",
+    "1. Log into your dashboard and review your branding",
+    "2. Set up your offers (the products/services you want to promote)",
+    "3. Test your app by running through a coaching session yourself",
+    "4. Share your link with clients and on social media!",
+    "",
+    "GETTING LEADS:",
+    "When someone signs up on your app, you'll receive an email notification",
+    "with their contact info. You can also export all leads from your dashboard.",
+    "",
+    "Need help? Just reply to this email.",
+    "",
+    "Welcome aboard!",
+    "— Keith",
+  ].join("\n");
+}
+
+/**
+ * Send welcome email to coach when their app is approved.
+ */
+async function sendCoachWelcomeEmail({
+  coachEmail,
+  coachName,
+  businessName,
+  subdomain,
+  customDomain,
+}) {
+  if (!coachEmail) {
+    throw new Error("sendCoachWelcomeEmail: 'coachEmail' is required");
+  }
+  if (!subdomain && !customDomain) {
+    throw new Error("sendCoachWelcomeEmail: either 'subdomain' or 'customDomain' is required");
+  }
+
+  const from = buildFrom();
+  const subject = `Your ${businessName || "ClosureAI"} coaching app is live!`;
+
+  // Build dashboard URL
+  let dashboardUrl;
+  if (customDomain) {
+    dashboardUrl = `https://${customDomain}/my-app`;
+  } else {
+    dashboardUrl = `https://${subdomain}.getclosureai.com/my-app`;
+  }
+
+  const htmlBody = buildCoachWelcomeHtml({
+    coachName,
+    businessName,
+    subdomain,
+    customDomain,
+    dashboardUrl,
+  });
+  const textBody = buildCoachWelcomeText({
+    coachName,
+    businessName,
+    subdomain,
+    customDomain,
+    dashboardUrl,
+  });
+
+  const params = {
+    Source: from,
+    Destination: {
+      ToAddresses: [coachEmail],
+    },
+    ReplyToAddresses: EMAIL_CONFIG.replyToEmail
+      ? [EMAIL_CONFIG.replyToEmail]
+      : [],
+    Message: {
+      Subject: {
+        Data: subject,
+        Charset: "UTF-8",
+      },
+      Body: {
+        Html: {
+          Data: htmlBody,
+          Charset: "UTF-8",
+        },
+        Text: {
+          Data: textBody,
+          Charset: "UTF-8",
+        },
+      },
+    },
+  };
+
+  const command = new SendEmailCommand(params);
+  await sesClient.send(command);
+}
+
 module.exports = {
   sendMagicLinkEmail,
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendLeadNotificationEmail,
+  sendCoachWelcomeEmail,
 };

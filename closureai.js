@@ -16,7 +16,7 @@ const STRIPE_CONFIG = require("./config/stripeConfig");
 const UI_CONFIG = require("./config/uiConfig");
 
 const db = require("./db");
-const { sendMagicLinkEmail, sendVerificationEmail, sendPasswordResetEmail, sendLeadNotificationEmail } = require("./email/sesEmail");
+const { sendMagicLinkEmail, sendVerificationEmail, sendPasswordResetEmail, sendLeadNotificationEmail, sendCoachWelcomeEmail } = require("./email/sesEmail");
 const bcrypt = require("bcryptjs");
 
 const stripe = require("stripe")(STRIPE_CONFIG.secretKey || "");
@@ -5965,7 +5965,21 @@ app.post("/api/platform/coaches/:id/approve", requireAuth, requirePlatformAdmin,
       );
     }
 
-    // TODO: Send welcome email to coach
+    // Send welcome email to coach
+    try {
+      await sendCoachWelcomeEmail({
+        coachEmail: app.coach_email,
+        coachName: app.coach_name,
+        businessName: app.business_name,
+        subdomain: app.subdomain,
+        customDomain: app.custom_domain,
+      });
+      console.log(`[Platform] Welcome email sent to ${app.coach_email}`);
+    } catch (emailErr) {
+      // Don't fail the approval if email fails
+      console.error(`[Platform] Failed to send welcome email to ${app.coach_email}:`, emailErr.message);
+    }
+
     console.log(`[PLATFORM] Approved coach: ${app.coach_email} (${app.business_name})`);
 
     return res.json({ ok: true, app: result.rows[0] });
